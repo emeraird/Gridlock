@@ -67,7 +67,7 @@ struct DailyChallengeView: View {
             .background(Color(uiColor: themeManager.currentTheme.backgroundColor))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundColor(.white)
                 }

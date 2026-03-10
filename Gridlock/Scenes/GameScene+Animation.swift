@@ -260,7 +260,7 @@ extension GameScene {
         icon.zPosition = 60
         addChild(icon)
 
-        let targetPos = powerUpBar.convert(.zero, to: self)
+        let targetPos = powerUpBar.convert(CGPoint.zero, to: self)
 
         icon.run(SKAction.sequence([
             SKAction.group([

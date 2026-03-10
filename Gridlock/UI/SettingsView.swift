@@ -79,11 +79,11 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+            .toolbar(content: {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
-            }
+            })
             .alert("Purchases Restored", isPresented: $showRestoreAlert) {
                 Button("OK") {}
             }

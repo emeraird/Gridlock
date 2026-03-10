@@ -35,7 +35,7 @@ extension GameScene {
 
         // Check power-up bar taps
         if let powerUpNode = powerUpBar.children.first(where: { node in
-            let nodePos = node.convert(.zero, to: self)
+            let nodePos = node.convert(CGPoint.zero, to: self)
             return location.distance(to: nodePos) < 30
         }), let name = powerUpNode.name, name.hasPrefix("powerUp_") {
             let typeStr = String(name.dropFirst("powerUp_".count))
@@ -209,7 +209,7 @@ extension GameScene {
 
     private func returnPieceToTray(pieceIndex: Int, dragNode: SKNode) {
         let slot = pieceTrays[pieceIndex]
-        let targetPos = slot.convert(.zero, to: self)
+        let targetPos = slot.convert(CGPoint.zero, to: self)
 
         HapticManager.shared.invalidPlacement()
         AudioManager.shared.play(.invalidPlacement)

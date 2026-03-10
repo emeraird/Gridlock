@@ -88,7 +88,7 @@ final class TutorialOverlay {
         case 0:
             // Show arrow pointing from first piece in tray to the grid
             guard let traySlot = scene.pieceTrays.first else { return }
-            let slotPos = traySlot.convert(.zero, to: scene)
+            let slotPos = traySlot.convert(CGPoint.zero, to: scene)
 
             showArrow(from: slotPos, direction: .up, in: scene)
             showMessage("Drag the piece\nonto the grid!")
