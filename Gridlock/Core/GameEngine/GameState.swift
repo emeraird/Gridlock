@@ -155,7 +155,7 @@ final class GameState: ObservableObject {
         lastScoreEvent = scoreEvent
 
         // Track for adaptive difficulty
-        pieceGenerator.recordPlacement(didClearLines: !result.isEmpty)
+        pieceGenerator.recordPlacement(didClearLines: !result.isEmpty, cellsCleared: result.cellsCleared, grid: grid)
 
         // Check for power-up drops
         if !result.isEmpty {
