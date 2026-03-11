@@ -36,6 +36,11 @@ final class GameScene: SKScene {
     var comboLabel: SKLabelNode!
     var pauseButton: SKSpriteNode!
     var powerUpBar: SKNode!
+    var ghostTickerNode: SKNode?
+    var ghostTickerLabel: SKLabelNode?
+
+    // Ghost competitors
+    let ghostManager = GhostCompetitorManager()
 
     // Theme
     var theme: GameTheme { ThemeManager.shared.currentTheme }
@@ -56,6 +61,11 @@ final class GameScene: SKScene {
         gameState.startNewGame()
         refreshGrid()
         refreshPieceTray()
+
+        // Ghost competitors
+        ghostManager.generateGhosts(playerHighScore: gameState.scoreEngine.highScore)
+        ghostManager.startUpdating()
+        setupGhostTicker()
 
         // Start tutorial on first game
         if !UserProgressManager.shared.tutorialCompleted {
@@ -300,6 +310,70 @@ final class GameScene: SKScene {
         }
     }
 
+    // MARK: - Ghost Ticker
+
+    private func setupGhostTicker() {
+        let tickerNode = SKNode()
+        tickerNode.position = CGPoint(x: size.width / 2, y: size.height - 18)
+        tickerNode.zPosition = 99
+        addChild(tickerNode)
+        ghostTickerNode = tickerNode
+
+        let label = SKLabelNode(fontNamed: "SF Pro Display Medium")
+        label.fontSize = 10
+        label.fontColor = .white.withAlphaComponent(0.6)
+        label.horizontalAlignmentMode = .center
+        label.verticalAlignmentMode = .center
+        tickerNode.addChild(label)
+        ghostTickerLabel = label
+
+        // Background bar
+        let bg = SKShapeNode(rectOf: CGSize(width: size.width - 20, height: 18), cornerRadius: 4)
+        bg.fillColor = UIColor.black.withAlphaComponent(0.3)
+        bg.strokeColor = .clear
+        bg.zPosition = -1
+        tickerNode.addChild(bg)
+    }
+
+    func updateGhostTicker() {
+        guard let label = ghostTickerLabel else { return }
+        let standings = ghostManager.finalStandings()
+        let parts = standings.prefix(3).map { entry -> String in
+            let name = entry.isPlayer ? "You" : entry.name
+            return "\(entry.emoji) \(name) — \(entry.score)"
+        }
+        label.text = parts.joined(separator: "  |  ")
+    }
+
+    func handleGhostOvertake(_ event: GhostCompetitorManager.OvertakeEvent) {
+        if event.playerOvertook {
+            // Player passed a ghost — celebration
+            let label = SKLabelNode(text: "You passed \(event.ghostName)!")
+            label.fontName = "SF Pro Display Bold"
+            label.fontSize = 14
+            label.fontColor = .green
+            label.position = CGPoint(x: size.width / 2, y: size.height - 40)
+            label.zPosition = 98
+            label.alpha = 0
+            addChild(label)
+            label.run(SKAction.sequence([
+                SKAction.fadeIn(withDuration: 0.2),
+                SKAction.wait(forDuration: 1.0),
+                SKAction.fadeOut(withDuration: 0.3),
+                SKAction.removeFromParent()
+            ]))
+            HapticManager.shared.buttonTap()
+            AudioManager.shared.play(.buttonTap)
+        } else {
+            // Ghost passed player — alert
+            ghostTickerNode?.run(SKAction.sequence([
+                SKAction.colorize(with: .red, colorBlendFactor: 0.5, duration: 0.1),
+                SKAction.wait(forDuration: 0.3),
+                SKAction.colorize(withColorBlendFactor: 0, duration: 0.2)
+            ]))
+        }
+    }
+
     // MARK: - State Binding
 
     private func bindState() {
@@ -308,6 +382,17 @@ final class GameScene: SKScene {
             .receive(on: RunLoop.main)
             .sink { [weak self] score in
                 self?.scoreLabel.text = "\(score)"
+                self?.ghostManager.updatePlayerScore(score)
+                self?.updateGhostTicker()
+            }
+            .store(in: &cancellables)
+
+        // Observe ghost overtake events
+        ghostManager.$lastOvertakeEvent
+            .compactMap { $0 }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] event in
+                self?.handleGhostOvertake(event)
             }
             .store(in: &cancellables)
 
