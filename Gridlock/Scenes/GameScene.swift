@@ -42,6 +42,10 @@ final class GameScene: SKScene {
     // Ghost competitors
     let ghostManager = GhostCompetitorManager()
 
+    // Zone state
+    let zoneManager = ZoneStateManager()
+    var zoneOverlayNode: SKNode?
+
     // Theme
     var theme: GameTheme { ThemeManager.shared.currentTheme }
 
@@ -61,6 +65,11 @@ final class GameScene: SKScene {
         gameState.startNewGame()
         refreshGrid()
         refreshPieceTray()
+
+        // Zone state reset
+        zoneManager.resetForNewGame()
+        zoneOverlayNode?.removeFromParent()
+        zoneOverlayNode = nil
 
         // Ghost competitors
         ghostManager.generateGhosts(playerHighScore: gameState.scoreEngine.highScore)

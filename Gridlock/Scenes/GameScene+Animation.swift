@@ -395,6 +395,14 @@ extension GameScene {
         HapticManager.shared.gameOver()
         AudioManager.shared.play(.gameOver)
 
+        // Clean up zone state
+        zoneOverlayNode?.removeFromParent()
+        zoneOverlayNode = nil
+        zoneManager.onComboBreak()
+
+        // Stop ghost competitors
+        ghostManager.stopUpdating()
+
         // Darken overlay
         let overlay = SKSpriteNode(color: UIColor.black.withAlphaComponent(0.7), size: size)
         overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -539,10 +547,21 @@ extension GameScene {
         switch name {
         case "playAgainButton":
             dismissGameOver {
+                // Reset zone state
+                self.zoneManager.resetForNewGame()
+                self.zoneOverlayNode?.removeFromParent()
+                self.zoneOverlayNode = nil
+
+                // Reset ghost competitors
+                self.ghostManager.stopUpdating()
+                self.ghostManager.generateGhosts(playerHighScore: self.gameState.scoreEngine.highScore)
+                self.ghostManager.startUpdating()
+
                 self.gameState.startNewGame()
                 self.refreshGrid()
                 self.refreshPieceTray()
                 self.updatePowerUpBar()
+                self.updateGhostTicker()
             }
 
         case "continueAdButton":
@@ -577,6 +596,289 @@ extension GameScene {
         container?.run(SKAction.sequence([fadeOut, SKAction.removeFromParent()])) {
             completion()
         }
+    }
+}
+
+    // MARK: - Zone State Visuals
+
+    func enterZoneMode() {
+        guard zoneOverlayNode == nil else { return }
+
+        let overlay = SKNode()
+        overlay.name = "zoneOverlay"
+        overlay.zPosition = 0.8
+        addChild(overlay)
+        zoneOverlayNode = overlay
+
+        // Vignette overlay (darkened edges, bright center)
+        let vignette = SKSpriteNode(color: .clear, size: size)
+        vignette.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        vignette.name = "zoneVignette"
+
+        let vignetteColor = UIColor(red: 1.0, green: 0.3, blue: 0.0, alpha: 0.08)
+        vignette.color = vignetteColor
+        vignette.colorBlendFactor = 1.0
+        vignette.alpha = 0
+        overlay.addChild(vignette)
+
+        vignette.run(SKAction.fadeAlpha(to: 1.0, duration: 0.3))
+
+        // Grid border glow
+        let totalGridSize = cellSize * CGFloat(gridSize)
+        let glowBorder = SKShapeNode(rectOf: CGSize(width: totalGridSize + 8, height: totalGridSize + 8), cornerRadius: 6)
+        glowBorder.position = CGPoint(
+            x: gridOrigin.x + totalGridSize / 2,
+            y: gridOrigin.y + totalGridSize / 2
+        )
+        glowBorder.strokeColor = UIColor.orange.withAlphaComponent(0.8)
+        glowBorder.lineWidth = 3
+        glowBorder.fillColor = .clear
+        glowBorder.name = "zoneGlow"
+        glowBorder.glowWidth = 8
+        overlay.addChild(glowBorder)
+
+        // Pulsing glow animation
+        glowBorder.run(SKAction.repeatForever(SKAction.sequence([
+            SKAction.fadeAlpha(to: 0.4, duration: 0.5),
+            SKAction.fadeAlpha(to: 1.0, duration: 0.5)
+        ])))
+
+        // "🔥 ZONE!" banner
+        showZoneBanner()
+
+        // Zone ambient particles
+        startZoneParticles()
+    }
+
+    private func showZoneBanner() {
+        let banner = SKLabelNode(text: "🔥 ZONE!")
+        banner.fontName = "SF Pro Display Heavy"
+        banner.fontSize = 44
+        banner.fontColor = .orange
+        banner.position = CGPoint(x: size.width / 2, y: size.height / 2 + 60)
+        banner.zPosition = 85
+        banner.alpha = 0
+        banner.setScale(0.3)
+        banner.name = "zoneBanner"
+
+        let shadow = SKLabelNode(text: "🔥 ZONE!")
+        shadow.fontName = banner.fontName
+        shadow.fontSize = banner.fontSize
+        shadow.fontColor = .black.withAlphaComponent(0.6)
+        shadow.position = CGPoint(x: 3, y: -3)
+        shadow.zPosition = -1
+        banner.addChild(shadow)
+
+        addChild(banner)
+
+        banner.run(SKAction.sequence([
+            SKAction.group([
+                SKAction.fadeIn(withDuration: 0.15),
+                SKAction.bounceIn(to: 1.3, duration: 0.25)
+            ]),
+            SKAction.scale(to: 1.0, duration: 0.1),
+            SKAction.wait(forDuration: 0.8),
+            SKAction.group([
+                SKAction.fadeOut(withDuration: 0.4),
+                SKAction.moveBy(x: 0, y: 50, duration: 0.4)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+
+        HapticManager.shared.comboHaptic(level: 4)
+    }
+
+    private func startZoneParticles() {
+        guard let overlay = zoneOverlayNode else { return }
+
+        let emitter = SKNode()
+        emitter.name = "zoneEmitter"
+        overlay.addChild(emitter)
+
+        // Spawn fire-like particles along grid edges
+        let spawnAction = SKAction.repeatForever(SKAction.sequence([
+            SKAction.run { [weak self] in
+                guard let self = self else { return }
+                let intensity = self.zoneManager.zoneIntensity
+                let particleCount = max(1, Int(intensity * 3))
+
+                for _ in 0..<particleCount {
+                    let particle = SKSpriteNode(
+                        color: [UIColor.orange, .yellow, .red].randomElement()!,
+                        size: CGSize(width: 4, height: 4)
+                    )
+
+                    let totalGridSize = self.cellSize * CGFloat(self.gridSize)
+                    let side = Int.random(in: 0...3)
+                    switch side {
+                    case 0: // bottom
+                        particle.position = CGPoint(
+                            x: self.gridOrigin.x + CGFloat.random(in: 0...totalGridSize),
+                            y: self.gridOrigin.y - 4
+                        )
+                    case 1: // top
+                        particle.position = CGPoint(
+                            x: self.gridOrigin.x + CGFloat.random(in: 0...totalGridSize),
+                            y: self.gridOrigin.y + totalGridSize + 4
+                        )
+                    case 2: // left
+                        particle.position = CGPoint(
+                            x: self.gridOrigin.x - 4,
+                            y: self.gridOrigin.y + CGFloat.random(in: 0...totalGridSize)
+                        )
+                    default: // right
+                        particle.position = CGPoint(
+                            x: self.gridOrigin.x + totalGridSize + 4,
+                            y: self.gridOrigin.y + CGFloat.random(in: 0...totalGridSize)
+                        )
+                    }
+
+                    particle.zPosition = 1
+                    particle.alpha = 0.8
+                    emitter.addChild(particle)
+
+                    let dx = CGFloat.random(in: -20...20)
+                    let dy = CGFloat.random(in: 20...60)
+                    particle.run(SKAction.sequence([
+                        SKAction.group([
+                            SKAction.moveBy(x: dx, y: dy, duration: 0.6),
+                            SKAction.fadeOut(withDuration: 0.6),
+                            SKAction.scale(to: 0.2, duration: 0.6)
+                        ]),
+                        SKAction.removeFromParent()
+                    ]))
+                }
+            },
+            SKAction.wait(forDuration: 0.2)
+        ]))
+        emitter.run(spawnAction)
+    }
+
+    func updateZoneIntensity() {
+        guard zoneManager.isInZone, let overlay = zoneOverlayNode else { return }
+
+        let intensity = zoneManager.zoneIntensity
+
+        // Update vignette opacity based on intensity
+        if let vignette = overlay.childNode(withName: "zoneVignette") as? SKSpriteNode {
+            let alpha = 0.05 + intensity * 0.1
+            vignette.alpha = CGFloat(alpha)
+        }
+
+        // Update glow border color intensity
+        if let glow = overlay.childNode(withName: "zoneGlow") as? SKShapeNode {
+            let glowWidth = 6 + intensity * 10
+            glow.glowWidth = CGFloat(glowWidth)
+        }
+    }
+
+    func exitZoneMode() {
+        guard let overlay = zoneOverlayNode else { return }
+
+        // Zone exit shatter effect
+        let shatterLabel = SKLabelNode(text: "ZONE LOST")
+        shatterLabel.fontName = "SF Pro Display Heavy"
+        shatterLabel.fontSize = 28
+        shatterLabel.fontColor = UIColor.red.withAlphaComponent(0.7)
+        shatterLabel.position = CGPoint(x: size.width / 2, y: size.height / 2 + 40)
+        shatterLabel.zPosition = 85
+        shatterLabel.alpha = 0
+        addChild(shatterLabel)
+
+        shatterLabel.run(SKAction.sequence([
+            SKAction.fadeAlpha(to: 0.8, duration: 0.1),
+            SKAction.wait(forDuration: 0.5),
+            SKAction.group([
+                SKAction.fadeOut(withDuration: 0.4),
+                SKAction.moveBy(x: 0, y: 30, duration: 0.4)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+
+        // Fade out zone overlay
+        overlay.run(SKAction.sequence([
+            SKAction.fadeOut(withDuration: 0.4),
+            SKAction.removeFromParent()
+        ]))
+        zoneOverlayNode = nil
+
+        HapticManager.shared.gameOver()
+    }
+
+    func showZoneComboMessage() {
+        guard let message = zoneManager.comboMessage else { return }
+        let level = zoneManager.comboLevel
+
+        // Enhanced combo message during zone
+        let label = SKLabelNode(text: message)
+        label.fontName = "SF Pro Display Heavy"
+        label.fontSize = level >= 4 ? 36 : 28
+        label.fontColor = level >= 7 ? .yellow : (level >= 4 ? .orange : theme.comboColor(for: level))
+        label.position = CGPoint(x: size.width / 2, y: size.height / 2 + 30)
+        label.zPosition = 82
+        label.alpha = 0
+        label.setScale(0.3)
+
+        addChild(label)
+
+        label.run(SKAction.sequence([
+            SKAction.group([
+                SKAction.fadeIn(withDuration: 0.1),
+                SKAction.bounceIn(to: 1.2, duration: 0.2)
+            ]),
+            SKAction.scale(to: 1.0, duration: 0.1),
+            SKAction.wait(forDuration: 0.6),
+            SKAction.group([
+                SKAction.fadeOut(withDuration: 0.3),
+                SKAction.moveBy(x: 0, y: 50, duration: 0.3)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+
+        // Record indicators
+        if zoneManager.newComboRecord {
+            showComboRecordBadge()
+        } else if zoneManager.tiedBestCombo {
+            showComboTiedBadge()
+        }
+    }
+
+    private func showComboRecordBadge() {
+        let badge = SKLabelNode(text: "⭐ NEW RECORD!")
+        badge.fontName = "SF Pro Display Heavy"
+        badge.fontSize = 16
+        badge.fontColor = .yellow
+        badge.position = CGPoint(x: size.width / 2, y: size.height / 2 - 5)
+        badge.zPosition = 83
+        badge.alpha = 0
+        addChild(badge)
+
+        badge.run(SKAction.sequence([
+            SKAction.wait(forDuration: 0.3),
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.wait(forDuration: 1.0),
+            SKAction.fadeOut(withDuration: 0.3),
+            SKAction.removeFromParent()
+        ]))
+    }
+
+    private func showComboTiedBadge() {
+        let badge = SKLabelNode(text: "Tied Best!")
+        badge.fontName = "SF Pro Display Bold"
+        badge.fontSize = 14
+        badge.fontColor = .white.withAlphaComponent(0.7)
+        badge.position = CGPoint(x: size.width / 2, y: size.height / 2 - 5)
+        badge.zPosition = 83
+        badge.alpha = 0
+        addChild(badge)
+
+        badge.run(SKAction.sequence([
+            SKAction.wait(forDuration: 0.3),
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.wait(forDuration: 0.8),
+            SKAction.fadeOut(withDuration: 0.3),
+            SKAction.removeFromParent()
+        ]))
     }
 }
 

@@ -199,7 +199,28 @@ extension GameScene {
                 if scoreEvent.isNewHighScore {
                     animateNewHighScore()
                 }
+
+                // Zone state: track combo hit
+                let wasInZone = zoneManager.isInZone
+                zoneManager.onComboHit(level: scoreEvent.comboLevel)
+
+                // Enter zone mode visually
+                if zoneManager.isInZone && !wasInZone {
+                    enterZoneMode()
+                }
+
+                // Show zone combo messages
+                if zoneManager.isInZone {
+                    showZoneComboMessage()
+                    updateZoneIntensity()
+                }
             }
+        } else {
+            // No lines cleared — combo breaks
+            if zoneManager.isInZone {
+                exitZoneMode()
+            }
+            zoneManager.onComboBreak()
         }
 
         // Update power-up bar
