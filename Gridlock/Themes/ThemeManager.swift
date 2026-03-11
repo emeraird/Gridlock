@@ -15,6 +15,7 @@ final class ThemeManager: ObservableObject {
     private init() {
         let allThemes: [GameTheme] = [
             ClassicTheme(),
+            SydneyTheme(),
             NeonTheme(),
             OceanTheme(),
             SpaceTheme()
