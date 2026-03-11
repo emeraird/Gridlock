@@ -20,6 +20,12 @@ enum SoundEffect: String, CaseIterable {
     case invalidPlacement = "invalid_placement"
     case piecePickup = "piece_pickup"
     case hoverCell = "hover_cell"
+    case zoneEnter = "zone_enter"
+    case zoneExit = "zone_exit"
+    case milestone = "milestone"
+    case dailyReward = "daily_reward"
+    case nearDeath = "near_death"
+    case tightFit = "tight_fit"
 
     var frequency: Double {
         switch self {
@@ -38,6 +44,12 @@ enum SoundEffect: String, CaseIterable {
         case .invalidPlacement: return 200
         case .piecePickup: return 550
         case .hoverCell: return 480
+        case .zoneEnter: return 1000
+        case .zoneExit: return 300
+        case .milestone: return 880
+        case .dailyReward: return 660
+        case .nearDeath: return 150
+        case .tightFit: return 700
         }
     }
 
@@ -58,6 +70,12 @@ enum SoundEffect: String, CaseIterable {
         case .invalidPlacement: return 0.08
         case .piecePickup: return 0.04
         case .hoverCell: return 0.02
+        case .zoneEnter: return 0.35
+        case .zoneExit: return 0.25
+        case .milestone: return 0.3
+        case .dailyReward: return 0.25
+        case .nearDeath: return 0.15
+        case .tightFit: return 0.08
         }
     }
 
@@ -70,6 +88,12 @@ enum SoundEffect: String, CaseIterable {
         case .gameOver: return .descending
         case .invalidPlacement: return .buzz
         case .piecePickup: return .sine
+        case .zoneEnter: return .chime
+        case .zoneExit: return .descending
+        case .milestone: return .chime
+        case .dailyReward: return .chime
+        case .nearDeath: return .buzz
+        case .tightFit: return .sine
         }
     }
 }

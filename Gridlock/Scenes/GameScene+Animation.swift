@@ -878,8 +878,8 @@ extension GameScene {
         }
 
         updatePowerUpBar()
-        HapticManager.shared.powerUpEarned()
-        AudioManager.shared.play(.powerUpEarn)
+        HapticManager.shared.dailyRewardCollect()
+        AudioManager.shared.play(.dailyReward)
     }
 
     // MARK: - Milestone Celebration
@@ -973,8 +973,8 @@ extension GameScene {
         spawnMilestoneParticles()
 
         // Haptic + audio
-        HapticManager.shared.comboHaptic(level: 3)
-        AudioManager.shared.play(.powerUpEarn)
+        HapticManager.shared.milestoneCelebration()
+        AudioManager.shared.play(.milestone)
     }
 
     private func spawnMilestoneParticles() {
@@ -1092,7 +1092,9 @@ extension GameScene {
             SKAction.removeFromParent()
         ]))
 
-        HapticManager.shared.comboHaptic(level: 4)
+        HapticManager.shared.zoneEntry()
+        AudioManager.shared.play(.zoneEnter)
+        AudioManager.shared.duckMusic(duration: 0.5)
     }
 
     private func startZoneParticles() {
@@ -1209,7 +1211,8 @@ extension GameScene {
         ]))
         zoneOverlayNode = nil
 
-        HapticManager.shared.gameOver()
+        HapticManager.shared.zoneExit()
+        AudioManager.shared.play(.zoneExit)
     }
 
     func showZoneComboMessage() {
