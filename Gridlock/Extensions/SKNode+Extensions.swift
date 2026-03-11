@@ -89,6 +89,34 @@ extension SKAction {
         return SKAction.sequence([overshoot, settle])
     }
 
+    /// Squash-and-stretch landing animation
+    static func squashLanding(duration: TimeInterval = 0.12) -> SKAction {
+        let squash = SKAction.group([
+            SKAction.scaleX(to: 1.15, duration: duration * 0.4),
+            SKAction.scaleY(to: 0.85, duration: duration * 0.4)
+        ])
+        let recover = SKAction.group([
+            SKAction.scaleX(to: 0.95, duration: duration * 0.3),
+            SKAction.scaleY(to: 1.05, duration: duration * 0.3)
+        ])
+        let settle = SKAction.scale(to: 1.0, duration: duration * 0.3)
+        return SKAction.sequence([squash, recover, settle])
+    }
+
+    /// Jelly wobble animation (for tight fits)
+    static func jellyWobble(duration: TimeInterval = 0.3) -> SKAction {
+        var actions: [SKAction] = []
+        let wobbleCount = 3
+        for i in 0..<wobbleCount {
+            let intensity = 1.0 - (Double(i) / Double(wobbleCount))
+            let angle = CGFloat(0.03 * intensity)
+            actions.append(SKAction.rotate(byAngle: angle, duration: duration / Double(wobbleCount * 2)))
+            actions.append(SKAction.rotate(byAngle: -angle * 2, duration: duration / Double(wobbleCount * 2)))
+        }
+        actions.append(SKAction.rotate(toAngle: 0, duration: duration * 0.1))
+        return SKAction.sequence(actions)
+    }
+
     /// Count-up number animation
     static func countUp(from start: Int, to end: Int, duration: TimeInterval, update: @escaping (Int) -> Void) -> SKAction {
         let steps = 30

@@ -185,11 +185,44 @@ extension GameScene {
 
         // Refresh grid visually
         refreshGrid()
-        refreshPieceTray()
 
-        // Audio + haptic for placement
-        HapticManager.shared.piecePlaced()
-        AudioManager.shared.play(.placeBlock)
+        // Squash-stretch landing animation on placed blocks
+        for cell in piece.cells {
+            let r = position.row + cell.row
+            let c = position.col + cell.col
+            if let blockNode = blockNodes[r][c] {
+                blockNode.run(SKAction.squashLanding())
+            }
+        }
+
+        // Detect tight fit for bonus feedback
+        let isTight = BoardAnalyzer.isTightFit(piece: piece, at: position, on: gameState.grid)
+        if isTight {
+            HapticManager.shared.tightFit()
+            AudioManager.shared.play(.tightFit)
+
+            // Show "Tight!" label
+            let tightLabel = SKLabelNode(text: "Tight! ✨")
+            tightLabel.fontName = "SF Pro Display Bold"
+            tightLabel.fontSize = 14
+            tightLabel.fontColor = .cyan
+            let worldPos = gridNode.convert(positionForCell(row: position.row, col: position.col), to: self)
+            tightLabel.position = CGPoint(x: worldPos.x, y: worldPos.y + 20)
+            tightLabel.zPosition = 70
+            tightLabel.alpha = 0
+            addChild(tightLabel)
+            tightLabel.run(SKAction.sequence([
+                SKAction.fadeIn(withDuration: 0.1),
+                SKAction.moveBy(x: 0, y: 25, duration: 0.5),
+                SKAction.fadeOut(withDuration: 0.2),
+                SKAction.removeFromParent()
+            ]))
+        } else {
+            HapticManager.shared.piecePlaced()
+            AudioManager.shared.play(.placeBlock)
+        }
+
+        refreshPieceTray()
 
         // Tutorial: piece placed
         tutorial?.onPiecePlaced()
