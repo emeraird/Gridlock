@@ -71,6 +71,7 @@ final class GameScene: SKScene {
 
         // Session tracking
         SessionManager.shared.onGameStart()
+        NotificationScheduler.onGamePlayed()
 
         // Apply mercy mode if player is struggling
         if SessionManager.shared.mercyBonusPieces {
