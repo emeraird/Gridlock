@@ -743,21 +743,16 @@ extension GameScene {
     }
 
     private func shareScore() {
-        let score = gameState.scoreEngine.currentScore
-        let lines = gameState.scoreEngine.totalLinesCleared
-        let bestCombo = zoneManager.bestComboThisGame
-
-        let shareText = """
-        🧩 Gridlock Score: \(score)
-        📊 Lines: \(lines) | Best Combo: \(bestCombo)x
-        Can you beat me? 🔥
-        """
-
-        NotificationCenter.default.post(
-            name: .shareScore,
-            object: nil,
-            userInfo: ["text": shareText, "score": score]
+        let result = ShareCardGenerator.GameResult(
+            score: gameState.scoreEngine.currentScore,
+            linesCleared: gameState.scoreEngine.totalLinesCleared,
+            bestCombo: zoneManager.bestComboThisGame,
+            timeElapsed: gameState.elapsedTime,
+            isNewHighScore: gameState.isNewHighScore,
+            rank: ghostManager.playerRank
         )
+
+        ShareCardGenerator.shared.shareGameResult(result, from: nil)
     }
 
     private func dismissGameOver(completion: @escaping () -> Void) {
