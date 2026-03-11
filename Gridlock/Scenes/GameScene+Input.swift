@@ -52,7 +52,7 @@ extension GameScene {
 
         // Check for piece tray touch
         for (index, slot) in pieceTrays.enumerated() {
-            guard gameState.availablePieces[safe: index] as? BlockPiece? != nil else { continue }
+            guard (gameState.availablePieces[safe: index] ?? nil) != nil else { continue }
             guard gameState.availablePieces[index] != nil else { continue }
 
             let slotLocation = touch.location(in: slot)
@@ -157,11 +157,6 @@ extension GameScene {
     }
 
     private func placePieceOnGrid(piece: BlockPiece, at position: GridPosition, trayIndex: Int, dragNode: SKNode) {
-        // Snap animation
-        let targetPositions = piece.cells.map { cell in
-            positionForCell(row: position.row + cell.row, col: position.col + cell.col)
-        }
-
         // Place in game state
         let result = gameState.placePiece(piece, at: position, trayIndex: trayIndex)
 
@@ -220,7 +215,7 @@ extension GameScene {
                 SKAction.scale(to: 0.6, duration: 0.2)
             ]),
             SKAction.removeFromParent()
-        ])) { [weak self] in
+        ])) {
             // Restore tray piece visibility
             slot.children.filter { $0.name == "piecePreview" }.forEach { $0.alpha = 1.0 }
         }

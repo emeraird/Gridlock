@@ -119,26 +119,27 @@ final class IAPManager: ObservableObject {
     // MARK: - Update Purchased
 
     private func updatePurchasedProducts() async {
-        var purchased = Set<String>()
+        var newPurchased = Set<String>()
 
         // Check subscriptions
         for await result in Transaction.currentEntitlements {
             do {
                 let transaction = try checkVerification(result)
                 if transaction.revocationDate == nil {
-                    purchased.insert(transaction.productID)
+                    newPurchased.insert(transaction.productID)
                 }
             } catch {
                 logger.error("Entitlement verification failed: \(error.localizedDescription)")
             }
         }
 
+        let finalPurchased = newPurchased
         await MainActor.run {
-            self.purchasedProductIDs = purchased
+            self.purchasedProductIDs = finalPurchased
             UserProgressManager.shared.removeAdsActive = self.isRemoveAdsActive
         }
 
-        logger.info("Updated purchases: \(purchased)")
+        logger.info("Updated purchases: \(finalPurchased)")
     }
 
     // MARK: - Product Helpers

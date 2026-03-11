@@ -25,7 +25,7 @@ struct ThemeStoreView: View {
                                 Task {
                                     if let productID = theme.productID,
                                        let product = iapManager.product(for: productID) {
-                                        try? await iapManager.purchase(product)
+                                        _ = try? await iapManager.purchase(product)
                                     }
                                 }
                             }

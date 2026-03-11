@@ -323,7 +323,7 @@ final class GameScene: SKScene {
             // Remove old piece preview
             slot.children.filter { $0.name == "piecePreview" }.forEach { $0.removeFromParent() }
 
-            guard let piece = gameState.availablePieces[safe: index] as? BlockPiece? ?? nil else { continue }
+            guard let piece = gameState.availablePieces[safe: index] ?? nil else { continue }
 
             let previewNode = createPieceNode(piece: piece, scale: 0.6)
             previewNode.name = "piecePreview"

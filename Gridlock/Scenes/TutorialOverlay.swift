@@ -19,7 +19,7 @@ final class TutorialOverlay {
     // MARK: - Tutorial Flow
 
     func startTutorial() {
-        guard let scene = scene else { return }
+        guard scene != nil else { return }
         currentStep = 0
 
         // The tutorial runs during actual gameplay (game is in .playing state)
