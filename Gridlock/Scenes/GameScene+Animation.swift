@@ -772,6 +772,116 @@ extension GameScene {
     }
 }
 
+    // MARK: - Daily Reward Popup
+
+    func showDailyRewardPopup() {
+        guard DailyRewardManager.shared.hasUncollectedReward,
+              let reward = DailyRewardManager.shared.todayReward else { return }
+
+        let popup = SKNode()
+        popup.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        popup.zPosition = 95
+        popup.name = "dailyRewardPopup"
+        popup.alpha = 0
+        popup.setScale(0.5)
+
+        let dim = SKSpriteNode(color: UIColor.black.withAlphaComponent(0.7), size: size)
+        dim.position = .zero
+        dim.zPosition = -1
+        popup.addChild(dim)
+
+        let card = SKShapeNode(rectOf: CGSize(width: 280, height: 240), cornerRadius: 20)
+        card.fillColor = UIColor(white: 0.12, alpha: 1.0)
+        card.strokeColor = UIColor.orange.withAlphaComponent(0.5)
+        card.lineWidth = 2
+        card.glowWidth = 6
+        popup.addChild(card)
+
+        let titleLabel = SKLabelNode(text: "Daily Reward")
+        titleLabel.fontName = "SF Pro Display Heavy"
+        titleLabel.fontSize = 22
+        titleLabel.fontColor = .white
+        titleLabel.position = CGPoint(x: 0, y: 80)
+        popup.addChild(titleLabel)
+
+        let emojiLabel = SKLabelNode(text: reward.emoji)
+        emojiLabel.fontSize = 50
+        emojiLabel.position = CGPoint(x: 0, y: 25)
+        popup.addChild(emojiLabel)
+
+        let rewardTitle = SKLabelNode(text: reward.title)
+        rewardTitle.fontName = "SF Pro Display Bold"
+        rewardTitle.fontSize = 18
+        rewardTitle.fontColor = .orange
+        rewardTitle.position = CGPoint(x: 0, y: -15)
+        popup.addChild(rewardTitle)
+
+        let descLabel = SKLabelNode(text: reward.bonusDescription)
+        descLabel.fontName = "SF Pro Display Semibold"
+        descLabel.fontSize = 14
+        descLabel.fontColor = UIColor.green
+        descLabel.position = CGPoint(x: 0, y: -40)
+        popup.addChild(descLabel)
+
+        let streakText = DailyRewardManager.shared.streakInfo
+        if !streakText.isEmpty {
+            let streakLabel = SKLabelNode(text: streakText)
+            streakLabel.fontName = "SF Pro Display Medium"
+            streakLabel.fontSize = 12
+            streakLabel.fontColor = .white.withAlphaComponent(0.6)
+            streakLabel.position = CGPoint(x: 0, y: -60)
+            popup.addChild(streakLabel)
+        }
+
+        let collectBtn = SKNode()
+        collectBtn.name = "collectDailyReward"
+        collectBtn.position = CGPoint(x: 0, y: -90)
+
+        let btnBg = SKShapeNode(rectOf: CGSize(width: 200, height: 44), cornerRadius: 12)
+        btnBg.fillColor = UIColor.orange
+        btnBg.strokeColor = .clear
+        collectBtn.addChild(btnBg)
+
+        let btnLabel = SKLabelNode(text: "Collect!")
+        btnLabel.fontName = "SF Pro Display Bold"
+        btnLabel.fontSize = 18
+        btnLabel.fontColor = .white
+        btnLabel.verticalAlignmentMode = .center
+        collectBtn.addChild(btnLabel)
+
+        popup.addChild(collectBtn)
+        addChild(popup)
+
+        popup.run(SKAction.group([
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.bounceIn(to: 1.0, duration: 0.3)
+        ]))
+    }
+
+    func collectDailyReward() {
+        guard let reward = DailyRewardManager.shared.collectReward(powerUpSystem: gameState.powerUpSystem) else { return }
+
+        if let popup = childNode(withName: "dailyRewardPopup") {
+            popup.run(SKAction.sequence([
+                SKAction.group([
+                    SKAction.fadeOut(withDuration: 0.2),
+                    SKAction.scale(to: 1.1, duration: 0.2)
+                ]),
+                SKAction.removeFromParent()
+            ]))
+        }
+
+        for (type, _) in reward.powerUps {
+            run(SKAction.wait(forDuration: 0.3)) { [weak self] in
+                self?.animatePowerUpEarned(type)
+            }
+        }
+
+        updatePowerUpBar()
+        HapticManager.shared.powerUpEarned()
+        AudioManager.shared.play(.powerUpEarn)
+    }
+
     // MARK: - Milestone Celebration
 
     func animateMilestone(_ event: MilestoneEvent) {

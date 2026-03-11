@@ -9,6 +9,26 @@ extension GameScene {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
+        // Daily reward popup: handle collect tap
+        if let popup = childNode(withName: "dailyRewardPopup") {
+            // Check if tapping the collect button
+            if let collectBtn = popup.childNode(withName: "collectDailyReward") {
+                let btnPos = collectBtn.convert(CGPoint.zero, to: self)
+                if location.distance(to: btnPos) < 60 {
+                    HapticManager.shared.buttonTap()
+                    collectDailyReward()
+                    return
+                }
+            }
+            // Tap outside dismisses
+            DailyRewardManager.shared.dismissPopup()
+            popup.run(SKAction.sequence([
+                SKAction.fadeOut(withDuration: 0.2),
+                SKAction.removeFromParent()
+            ]))
+            return
+        }
+
         // Game over state: handle button taps
         if gameState.phase == .gameOver {
             handleGameOverTouches(at: location)

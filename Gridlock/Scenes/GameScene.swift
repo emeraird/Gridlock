@@ -98,6 +98,13 @@ final class GameScene: SKScene {
             tutorial = TutorialOverlay(scene: self)
             tutorial?.startTutorial()
         }
+
+        // Show daily reward popup
+        if DailyRewardManager.shared.hasUncollectedReward {
+            run(SKAction.wait(forDuration: 0.5)) { [weak self] in
+                self?.showDailyRewardPopup()
+            }
+        }
     }
 
     // MARK: - Layout Calculation
