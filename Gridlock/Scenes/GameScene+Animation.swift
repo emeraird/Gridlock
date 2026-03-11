@@ -277,6 +277,52 @@ extension GameScene {
 
         HapticManager.shared.powerUpEarned()
         AudioManager.shared.play(.powerUpEarn)
+
+        // Show tooltip on first earn of this type
+        let tooltipKey = "powerUpTooltipShown_\(type.rawValue)"
+        if !UserDefaults.standard.bool(forKey: tooltipKey) {
+            UserDefaults.standard.set(true, forKey: tooltipKey)
+            showPowerUpTooltip(type)
+        }
+    }
+
+    private func showPowerUpTooltip(_ type: PowerUpType) {
+        let description: String
+        switch type {
+        case .bomb: description = "Bomb — Tap to destroy a 3×3 area!"
+        case .lineBlast: description = "Line Blast — Clears an entire row or column!"
+        case .undo: description = "Undo — Reverts your last move!"
+        case .shuffle: description = "Shuffle — Get a fresh set of pieces!"
+        }
+
+        let container = SKNode()
+        container.zPosition = 80
+        container.position = CGPoint(x: size.width / 2, y: gridOrigin.y - 70)
+        container.alpha = 0
+
+        let bg = SKShapeNode(rectOf: CGSize(width: 280, height: 40), cornerRadius: 10)
+        bg.fillColor = UIColor.black.withAlphaComponent(0.85)
+        bg.strokeColor = theme.uiAccentColor.withAlphaComponent(0.6)
+        bg.lineWidth = 1
+        container.addChild(bg)
+
+        let label = SKLabelNode(text: description)
+        label.fontName = "SF Pro Display Semibold"
+        label.fontSize = 13
+        label.fontColor = .white
+        label.verticalAlignmentMode = .center
+        label.horizontalAlignmentMode = .center
+        container.addChild(label)
+
+        container.name = "powerUpTooltip"
+        addChild(container)
+
+        container.run(SKAction.sequence([
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.wait(forDuration: 2.5),
+            SKAction.fadeOut(withDuration: 0.3),
+            SKAction.removeFromParent()
+        ]))
     }
 
     func animatePowerUpEffect(type: PowerUpType, affected: Set<GridPosition>) {

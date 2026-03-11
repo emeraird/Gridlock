@@ -171,9 +171,15 @@ extension GameScene {
         HapticManager.shared.piecePlaced()
         AudioManager.shared.play(.placeBlock)
 
+        // Tutorial: piece placed
+        tutorial?.onPiecePlaced()
+
         // Handle clear results
         if let clearResult = result, !clearResult.isEmpty {
             animateLineClear(result: clearResult)
+
+            // Tutorial: line cleared
+            tutorial?.onLineCleared()
 
             // Score event
             if let scoreEvent = gameState.lastScoreEvent {
@@ -181,6 +187,9 @@ extension GameScene {
                     showReinforcementMessage(msg, comboLevel: scoreEvent.comboLevel)
                 }
                 if scoreEvent.comboLevel >= 2 {
+                    // Tutorial: combo
+                    tutorial?.onCombo()
+
                     if let comboMsg = gameState.scoreEngine.comboMessage() {
                         showComboMessage(comboMsg, level: scoreEvent.comboLevel)
                     }

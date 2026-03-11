@@ -42,6 +42,9 @@ final class GameScene: SKScene {
 
     // MARK: - Lifecycle
 
+    // Tutorial
+    var tutorial: TutorialOverlay?
+
     override func didMove(to view: SKView) {
         backgroundColor = theme.backgroundColor
         setupLayout()
@@ -51,6 +54,14 @@ final class GameScene: SKScene {
         bindState()
 
         gameState.startNewGame()
+        refreshGrid()
+        refreshPieceTray()
+
+        // Start tutorial on first game
+        if !UserProgressManager.shared.tutorialCompleted {
+            tutorial = TutorialOverlay(scene: self)
+            tutorial?.startTutorial()
+        }
     }
 
     // MARK: - Layout Calculation
@@ -209,7 +220,7 @@ final class GameScene: SKScene {
         powerUpBar.removeAllChildren()
 
         let types = PowerUpType.allCases
-        let spacing: CGFloat = 60
+        let spacing: CGFloat = 70
         let totalWidth = spacing * CGFloat(types.count - 1)
         let startX = -totalWidth / 2
 
@@ -224,28 +235,45 @@ final class GameScene: SKScene {
 
     func createPowerUpButton(type: PowerUpType, count: Int) -> SKNode {
         let node = SKNode()
+        let isActive = count > 0
+        let iconColor = isActive ? theme.uiAccentColor : UIColor.gray
 
         // Icon background circle
-        let circle = SKShapeNode(circleOfRadius: 20)
-        circle.fillColor = count > 0 ? theme.uiAccentColor.withAlphaComponent(0.3) : UIColor.gray.withAlphaComponent(0.15)
-        circle.strokeColor = count > 0 ? theme.uiAccentColor : UIColor.gray.withAlphaComponent(0.3)
+        let circle = SKShapeNode(circleOfRadius: 22)
+        circle.fillColor = isActive ? theme.uiAccentColor.withAlphaComponent(0.25) : UIColor.gray.withAlphaComponent(0.1)
+        circle.strokeColor = isActive ? theme.uiAccentColor : UIColor.gray.withAlphaComponent(0.3)
         circle.lineWidth = 1.5
         node.addChild(circle)
 
-        // Icon (SF Symbol name as text)
-        let icon = SKLabelNode(text: powerUpEmoji(type))
-        icon.fontSize = 16
-        icon.fontColor = count > 0 ? theme.uiAccentColor : UIColor.gray
-        icon.verticalAlignmentMode = .center
-        icon.horizontalAlignmentMode = .center
-        node.addChild(icon)
+        // SF Symbol icon rendered as texture
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+        if let symbolImage = UIImage(systemName: type.iconName, withConfiguration: symbolConfig)?
+            .withTintColor(iconColor, renderingMode: .alwaysOriginal) {
+            let texture = SKTexture(image: symbolImage)
+            let iconSprite = SKSpriteNode(texture: texture)
+            iconSprite.size = CGSize(width: 22, height: 22)
+            iconSprite.position = CGPoint(x: 0, y: 2)
+            iconSprite.zPosition = 1
+            node.addChild(iconSprite)
+        }
+
+        // Label underneath
+        let nameLabel = SKLabelNode(text: type.displayName)
+        nameLabel.fontName = "SF Pro Display Medium"
+        nameLabel.fontSize = 9
+        nameLabel.fontColor = isActive ? .white.withAlphaComponent(0.8) : .gray.withAlphaComponent(0.5)
+        nameLabel.verticalAlignmentMode = .top
+        nameLabel.horizontalAlignmentMode = .center
+        nameLabel.position = CGPoint(x: 0, y: -27)
+        node.addChild(nameLabel)
 
         // Count badge
         if count > 0 {
             let badge = SKShapeNode(circleOfRadius: 9)
-            badge.position = CGPoint(x: 15, y: 15)
+            badge.position = CGPoint(x: 16, y: 16)
             badge.fillColor = theme.uiAccentColor
             badge.strokeColor = .clear
+            badge.zPosition = 2
             node.addChild(badge)
 
             let countLabel = SKLabelNode(text: "\(count)")
@@ -255,6 +283,7 @@ final class GameScene: SKScene {
             countLabel.verticalAlignmentMode = .center
             countLabel.horizontalAlignmentMode = .center
             countLabel.position = badge.position
+            countLabel.zPosition = 3
             node.addChild(countLabel)
         }
 
@@ -262,11 +291,12 @@ final class GameScene: SKScene {
     }
 
     func powerUpEmoji(_ type: PowerUpType) -> String {
+        // Fallback text for animations
         switch type {
-        case .bomb: return "B"
-        case .lineBlast: return "L"
-        case .undo: return "U"
-        case .shuffle: return "S"
+        case .bomb: return "💣"
+        case .lineBlast: return "⚡"
+        case .undo: return "↩️"
+        case .shuffle: return "🔀"
         }
     }
 
@@ -278,6 +308,14 @@ final class GameScene: SKScene {
             .receive(on: RunLoop.main)
             .sink { [weak self] score in
                 self?.scoreLabel.text = "\(score)"
+            }
+            .store(in: &cancellables)
+
+        // Observe piece changes — refresh tray when new pieces arrive
+        gameState.$availablePieces
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.refreshPieceTray()
             }
             .store(in: &cancellables)
 
