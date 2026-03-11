@@ -105,6 +105,11 @@ final class ScoreEngine: ObservableObject {
         totalPiecesPlaced += 1
     }
 
+    func addBonusPoints(_ points: Int) {
+        currentScore += points
+        logger.info("Bonus points: +\(points), total=\(self.currentScore)")
+    }
+
     func resetCombo() {
         comboCount = 0
     }

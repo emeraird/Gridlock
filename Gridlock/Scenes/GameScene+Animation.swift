@@ -552,6 +552,9 @@ extension GameScene {
                 self.zoneOverlayNode?.removeFromParent()
                 self.zoneOverlayNode = nil
 
+                // Reset milestones
+                self.milestoneManager.resetForNewGame()
+
                 // Reset ghost competitors
                 self.ghostManager.stopUpdating()
                 self.ghostManager.generateGhosts(playerHighScore: self.gameState.scoreEngine.highScore)
@@ -598,6 +601,130 @@ extension GameScene {
         }
     }
 }
+
+    // MARK: - Milestone Celebration
+
+    func animateMilestone(_ event: MilestoneEvent) {
+        let milestone = event.milestone
+
+        // Celebration container
+        let container = SKNode()
+        container.position = CGPoint(x: size.width / 2, y: size.height / 2 + 80)
+        container.zPosition = 88
+        container.alpha = 0
+        container.setScale(0.3)
+        container.name = "milestoneContainer"
+        addChild(container)
+
+        // Background card
+        let cardWidth: CGFloat = 260
+        let cardHeight: CGFloat = event.reward.description.isEmpty ? 70 : 90
+        let card = SKShapeNode(rectOf: CGSize(width: cardWidth, height: cardHeight), cornerRadius: 16)
+        card.fillColor = UIColor.black.withAlphaComponent(0.85)
+        card.strokeColor = UIColor.orange.withAlphaComponent(0.7)
+        card.lineWidth = 2
+        card.glowWidth = 4
+        container.addChild(card)
+
+        // Emoji
+        let emojiLabel = SKLabelNode(text: milestone.emoji)
+        emojiLabel.fontSize = 28
+        emojiLabel.position = CGPoint(x: -cardWidth / 2 + 30, y: -2)
+        emojiLabel.verticalAlignmentMode = .center
+        container.addChild(emojiLabel)
+
+        // Title
+        let titleLabel = SKLabelNode(text: milestone.title)
+        titleLabel.fontName = "SF Pro Display Heavy"
+        titleLabel.fontSize = 18
+        titleLabel.fontColor = .white
+        titleLabel.horizontalAlignmentMode = .left
+        titleLabel.verticalAlignmentMode = .center
+        titleLabel.position = CGPoint(x: -cardWidth / 2 + 55, y: event.reward.description.isEmpty ? 0 : 10)
+        container.addChild(titleLabel)
+
+        // Score threshold
+        let thresholdLabel = SKLabelNode(text: "\(milestone.scoreThreshold) pts")
+        thresholdLabel.fontName = "SF Pro Display Bold"
+        thresholdLabel.fontSize = 11
+        thresholdLabel.fontColor = .orange
+        thresholdLabel.horizontalAlignmentMode = .right
+        thresholdLabel.verticalAlignmentMode = .center
+        thresholdLabel.position = CGPoint(x: cardWidth / 2 - 15, y: event.reward.description.isEmpty ? 0 : 10)
+        container.addChild(thresholdLabel)
+
+        // Reward description
+        if !event.reward.description.isEmpty {
+            let rewardLabel = SKLabelNode(text: "🎁 \(event.reward.description)")
+            rewardLabel.fontName = "SF Pro Display Semibold"
+            rewardLabel.fontSize = 12
+            rewardLabel.fontColor = UIColor.green
+            rewardLabel.horizontalAlignmentMode = .center
+            rewardLabel.verticalAlignmentMode = .center
+            rewardLabel.position = CGPoint(x: 10, y: -18)
+            container.addChild(rewardLabel)
+        }
+
+        // First-time badge
+        if event.isFirstTime {
+            let newBadge = SKLabelNode(text: "NEW!")
+            newBadge.fontName = "SF Pro Display Heavy"
+            newBadge.fontSize = 10
+            newBadge.fontColor = .yellow
+            newBadge.position = CGPoint(x: cardWidth / 2 - 20, y: cardHeight / 2 - 8)
+            container.addChild(newBadge)
+        }
+
+        // Animate in
+        container.run(SKAction.sequence([
+            SKAction.group([
+                SKAction.fadeIn(withDuration: 0.15),
+                SKAction.bounceIn(to: 1.0, duration: 0.25)
+            ]),
+            SKAction.wait(forDuration: 1.8),
+            SKAction.group([
+                SKAction.fadeOut(withDuration: 0.4),
+                SKAction.moveBy(x: 0, y: 40, duration: 0.4)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+
+        // Celebration particles
+        spawnMilestoneParticles()
+
+        // Haptic + audio
+        HapticManager.shared.comboHaptic(level: 3)
+        AudioManager.shared.play(.powerUpEarn)
+    }
+
+    private func spawnMilestoneParticles() {
+        let colors: [UIColor] = [.orange, .yellow, .white, .cyan]
+        let center = CGPoint(x: size.width / 2, y: size.height / 2 + 80)
+
+        for _ in 0..<16 {
+            let particle = SKSpriteNode(
+                color: colors.randomElement()!,
+                size: CGSize(width: 5, height: 5)
+            )
+            particle.position = center
+            particle.zPosition = 89
+            addChild(particle)
+
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let speed = CGFloat.random(in: 60...140)
+            let dx = cos(angle) * speed
+            let dy = sin(angle) * speed
+
+            particle.run(SKAction.sequence([
+                SKAction.group([
+                    SKAction.moveBy(x: dx, y: dy, duration: 0.5),
+                    SKAction.fadeOut(withDuration: 0.5),
+                    SKAction.scale(to: 0.3, duration: 0.5)
+                ]),
+                SKAction.removeFromParent()
+            ]))
+        }
+    }
 
     // MARK: - Zone State Visuals
 

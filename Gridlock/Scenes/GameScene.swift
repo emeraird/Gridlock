@@ -46,6 +46,9 @@ final class GameScene: SKScene {
     let zoneManager = ZoneStateManager()
     var zoneOverlayNode: SKNode?
 
+    // Milestone manager
+    let milestoneManager = MilestoneManager()
+
     // Theme
     var theme: GameTheme { ThemeManager.shared.currentTheme }
 
@@ -70,6 +73,9 @@ final class GameScene: SKScene {
         zoneManager.resetForNewGame()
         zoneOverlayNode?.removeFromParent()
         zoneOverlayNode = nil
+
+        // Milestone reset
+        milestoneManager.resetForNewGame()
 
         // Ghost competitors
         ghostManager.generateGhosts(playerHighScore: gameState.scoreEngine.highScore)
@@ -390,9 +396,12 @@ final class GameScene: SKScene {
         gameState.scoreEngine.$currentScore
             .receive(on: RunLoop.main)
             .sink { [weak self] score in
-                self?.scoreLabel.text = "\(score)"
-                self?.ghostManager.updatePlayerScore(score)
-                self?.updateGhostTicker()
+                guard let self = self else { return }
+                self.scoreLabel.text = "\(score)"
+                self.ghostManager.updatePlayerScore(score)
+                self.updateGhostTicker()
+                // Check milestones
+                self.milestoneManager.checkScore(score, powerUpSystem: self.gameState.powerUpSystem)
             }
             .store(in: &cancellables)
 
@@ -418,6 +427,19 @@ final class GameScene: SKScene {
             .receive(on: RunLoop.main)
             .sink { [weak self] event in
                 self?.animatePowerUpEarned(event.type)
+                self?.updatePowerUpBar()
+            }
+            .store(in: &cancellables)
+
+        // Observe milestone events
+        milestoneManager.milestonePublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] event in
+                self?.animateMilestone(event)
+                // Apply bonus points if milestone gives them
+                if event.reward.bonusPoints > 0 {
+                    self?.gameState.scoreEngine.addBonusPoints(event.reward.bonusPoints)
+                }
                 self?.updatePowerUpBar()
             }
             .store(in: &cancellables)
