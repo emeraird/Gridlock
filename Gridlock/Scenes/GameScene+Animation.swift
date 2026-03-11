@@ -1242,7 +1242,7 @@ extension GameScene {
     // MARK: - Near-Death Warning
 
     func checkNearDeathState() {
-        let fillPct = BoardAnalyzer.fillPercentage(of: gameState.grid)
+        let fillPct = BoardAnalyzer.fillPercentage(grid: gameState.grid)
         let dangerLevel = BoardAnalyzer.boardDangerLevel(grid: gameState.grid, pieces: gameState.availablePieces.compactMap { $0 })
 
         if dangerLevel >= 0.8 || fillPct >= 0.85 {
@@ -1272,7 +1272,7 @@ extension GameScene {
         AudioManager.shared.play(.nearDeath)
     }
 
-    private func hideNearDeathWarning() {
+    func hideNearDeathWarning() {
         if let overlay = childNode(withName: "nearDeathOverlay") {
             overlay.removeAction(forKey: "nearDeathPulse")
             overlay.run(SKAction.sequence([
