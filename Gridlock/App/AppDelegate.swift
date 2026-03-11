@@ -10,8 +10,41 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+
+        // Session analytics
+        AnalyticsManager.shared.logSessionStart()
+
+        // Preload ads
+        AdManager.shared.onSessionStart()
+
+        // Check streak status (may have expired)
+        StreakManager.shared.checkStreakStatus()
+
+        // Schedule notifications if permission was granted previously
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            if settings.authorizationStatus == .authorized {
+                DispatchQueue.main.async {
+                    NotificationScheduler.scheduleAll()
+                }
+            }
+        }
+
         logger.info("Gridlock launched")
         return true
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Save game state when backgrounding
+        NotificationCenter.default.post(name: .saveGameState, object: nil)
+        logger.info("App backgrounded — game state saved")
+    }
+
+    func applicationWillEnterForeground(_ application: UIApplication) {
+        // Refresh daily reward check
+        DailyRewardManager.shared.checkForReward()
+        StreakManager.shared.checkStreakStatus()
+        logger.info("App foregrounded — refreshed daily state")
     }
 
     func application(

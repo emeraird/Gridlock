@@ -16,6 +16,7 @@ extension GameScene {
                 let btnPos = ctaBtn.convert(CGPoint.zero, to: self)
                 if location.distance(to: btnPos) < 60 {
                     HapticManager.shared.buttonTap()
+                    AnalyticsManager.shared.log(.removeAdsUpsellTapped)
                     dismissRemoveAdsPopup()
                     // Trigger IAP purchase flow
                     Task {
@@ -318,8 +319,14 @@ extension GameScene {
         // Update power-up bar
         updatePowerUpBar()
 
+        // Check near-death state
+        if gameState.phase != .gameOver {
+            checkNearDeathState()
+        }
+
         // Check for game over
         if gameState.phase == .gameOver {
+            hideNearDeathWarning()
             animateGameOver()
         }
     }

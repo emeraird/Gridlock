@@ -561,6 +561,15 @@ extension GameScene {
         }
         yPos -= 15
 
+        // Record user progress stats
+        UserProgressManager.shared.recordGameEnd(
+            score: finalScore,
+            linesCleared: gameState.scoreEngine.totalLinesCleared,
+            blocksPlaced: gameState.scoreEngine.totalPiecesPlaced,
+            maxCombo: zoneManager.bestComboThisGame,
+            duration: gameState.elapsedTime
+        )
+
         // Session tracking
         SessionManager.shared.onGameEnd(
             score: finalScore,
@@ -568,16 +577,35 @@ extension GameScene {
             bestCombo: zoneManager.bestComboThisGame
         )
 
+        // Analytics
+        AnalyticsManager.shared.logGameOver(
+            score: finalScore,
+            linesCleared: gameState.scoreEngine.totalLinesCleared,
+            bestCombo: zoneManager.bestComboThisGame,
+            timeElapsed: gameState.elapsedTime,
+            isNewHigh: gameState.isNewHighScore
+        )
+
         // Smart interstitial ad + optional upsell
         AdManager.shared.handlePostGameAd(from: nil) { [weak self] showedAd, shouldUpsell in
             guard let self = self else { return }
             if shouldUpsell {
-                // Show upsell after a brief delay (let interstitial settle)
                 self.run(SKAction.wait(forDuration: 0.5)) {
                     self.showRemoveAdsUpsell()
                 }
             }
         }
+
+        // App review prompt (delayed, only after satisfying games)
+        run(SKAction.wait(forDuration: 3.0)) {
+            AppReviewManager.shared.requestReviewIfAppropriate(
+                score: finalScore,
+                isNewHighScore: self.gameState.isNewHighScore
+            )
+        }
+
+        // Request notification permission after N games
+        AppDelegate.requestNotificationPermissionIfNeeded()
 
         // Session nudge message
         if let nudge = SessionManager.shared.gameOverNudge {
@@ -666,6 +694,7 @@ extension GameScene {
     func animateNewHighScore() {
         HapticManager.shared.newHighScore()
         AudioManager.shared.play(.highScore)
+        AnalyticsManager.shared.log(.newHighScore, parameters: ["score": gameState.scoreEngine.currentScore])
 
         // Confetti particles
         let colors: [UIColor] = [.red, .yellow, .green, .blue, .purple, .orange, .cyan]
@@ -698,6 +727,7 @@ extension GameScene {
     func handleGameOverButton(named name: String) {
         switch name {
         case "playAgainButton":
+            AnalyticsManager.shared.log(.playAgain)
             dismissGameOver {
                 // Reset zone state
                 self.zoneManager.resetForNewGame()
@@ -712,9 +742,12 @@ extension GameScene {
                 self.ghostManager.generateGhosts(playerHighScore: self.gameState.scoreEngine.highScore)
                 self.ghostManager.startUpdating()
 
+                self.gameState.clearSavedGame()
                 self.gameState.startNewGame()
+                self.gameState.powerUpSystem.resetPointTracking()
                 SessionManager.shared.onGameStart()
                 AdManager.shared.onGameStart()
+                NotificationScheduler.onGamePlayed()
                 self.refreshGrid()
                 self.refreshPieceTray()
                 self.updatePowerUpBar()
@@ -730,6 +763,7 @@ extension GameScene {
             }
 
         case "continueAdButton":
+            AnalyticsManager.shared.log(.gameOverContinue)
             AdManager.shared.showRewardedAd(placement: .continueAfterGameOver, from: nil) { [weak self] success in
                 if success {
                     self?.dismissGameOver {
@@ -908,6 +942,7 @@ extension GameScene {
         updatePowerUpBar()
         HapticManager.shared.dailyRewardCollect()
         AudioManager.shared.play(.dailyReward)
+        AnalyticsManager.shared.log(.dailyRewardCollected)
     }
 
     func doubleDailyReward() {
@@ -933,6 +968,8 @@ extension GameScene {
                     SKAction.removeFromParent()
                 ]))
             }
+
+            AnalyticsManager.shared.log(.dailyRewardDoubled)
 
             // Show "Doubled!" label
             let doubledLabel = SKLabelNode(text: "DOUBLED! 🎉")
@@ -1163,9 +1200,14 @@ extension GameScene {
         // Celebration particles
         spawnMilestoneParticles()
 
-        // Haptic + audio
+        // Haptic + audio + analytics
         HapticManager.shared.milestoneCelebration()
         AudioManager.shared.play(.milestone)
+        AnalyticsManager.shared.logMilestone(
+            name: milestone.title,
+            score: milestone.scoreThreshold,
+            isFirstTime: event.isFirstTime
+        )
     }
 
     private func spawnMilestoneParticles() {
@@ -1192,6 +1234,49 @@ extension GameScene {
                     SKAction.fadeOut(withDuration: 0.5),
                     SKAction.scale(to: 0.3, duration: 0.5)
                 ]),
+                SKAction.removeFromParent()
+            ]))
+        }
+    }
+
+    // MARK: - Near-Death Warning
+
+    func checkNearDeathState() {
+        let fillPct = BoardAnalyzer.fillPercentage(of: gameState.grid)
+        let dangerLevel = BoardAnalyzer.boardDangerLevel(grid: gameState.grid, pieces: gameState.availablePieces.compactMap { $0 })
+
+        if dangerLevel >= 0.8 || fillPct >= 0.85 {
+            showNearDeathWarning()
+        } else {
+            hideNearDeathWarning()
+        }
+    }
+
+    private func showNearDeathWarning() {
+        guard childNode(withName: "nearDeathOverlay") == nil else { return }
+
+        // Red vignette pulse
+        let overlay = SKSpriteNode(color: UIColor.red.withAlphaComponent(0.05), size: size)
+        overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        overlay.zPosition = 0.6
+        overlay.name = "nearDeathOverlay"
+        overlay.alpha = 0
+        addChild(overlay)
+
+        overlay.run(SKAction.repeatForever(SKAction.sequence([
+            SKAction.fadeAlpha(to: 0.15, duration: 0.6),
+            SKAction.fadeAlpha(to: 0.0, duration: 0.6)
+        ])), withKey: "nearDeathPulse")
+
+        HapticManager.shared.nearDeathSave()
+        AudioManager.shared.play(.nearDeath)
+    }
+
+    private func hideNearDeathWarning() {
+        if let overlay = childNode(withName: "nearDeathOverlay") {
+            overlay.removeAction(forKey: "nearDeathPulse")
+            overlay.run(SKAction.sequence([
+                SKAction.fadeOut(withDuration: 0.3),
                 SKAction.removeFromParent()
             ]))
         }
@@ -1286,6 +1371,7 @@ extension GameScene {
         HapticManager.shared.zoneEntry()
         AudioManager.shared.play(.zoneEnter)
         AudioManager.shared.duckMusic(duration: 0.5)
+        AnalyticsManager.shared.log(.zoneEntered)
     }
 
     private func startZoneParticles() {
@@ -1489,4 +1575,5 @@ extension Notification.Name {
     static let returnToMenu = Notification.Name("returnToMenu")
     static let showDailyChallenge = Notification.Name("showDailyChallenge")
     static let shareScore = Notification.Name("shareScore")
+    static let saveGameState = Notification.Name("saveGameState")
 }

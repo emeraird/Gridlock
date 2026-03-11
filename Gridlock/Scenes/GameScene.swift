@@ -95,6 +95,16 @@ final class GameScene: SKScene {
         ghostManager.startUpdating()
         setupGhostTicker()
 
+        // Listen for background save
+        NotificationCenter.default.addObserver(
+            forName: .saveGameState,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.gameState.isPlaying else { return }
+            self.gameState.save()
+        }
+
         // Start tutorial on first game
         if !UserProgressManager.shared.tutorialCompleted {
             tutorial = TutorialOverlay(scene: self)
