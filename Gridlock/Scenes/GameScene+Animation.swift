@@ -404,7 +404,7 @@ extension GameScene {
         ghostManager.stopUpdating()
 
         // Darken overlay
-        let overlay = SKSpriteNode(color: UIColor.black.withAlphaComponent(0.7), size: size)
+        let overlay = SKSpriteNode(color: UIColor.black.withAlphaComponent(0.8), size: size)
         overlay.position = CGPoint(x: size.width / 2, y: size.height / 2)
         overlay.zPosition = 85
         overlay.alpha = 0
@@ -414,25 +414,28 @@ extension GameScene {
 
         // Game Over container
         let container = SKNode()
-        container.position = CGPoint(x: size.width / 2, y: size.height / 2 + 40)
+        container.position = CGPoint(x: size.width / 2, y: size.height / 2 + 120)
         container.zPosition = 90
         container.name = "gameOverContainer"
         addChild(container)
 
+        var yPos: CGFloat = 0
+
         // "GAME OVER" text
         let gameOverLabel = SKLabelNode(text: "GAME OVER")
         gameOverLabel.fontName = "SF Pro Display Heavy"
-        gameOverLabel.fontSize = 36
+        gameOverLabel.fontSize = 32
         gameOverLabel.fontColor = .white
-        gameOverLabel.position = CGPoint(x: 0, y: 80)
+        gameOverLabel.position = CGPoint(x: 0, y: yPos)
         container.addChild(gameOverLabel)
+        yPos -= 55
 
         // Score with count-up animation
         let scoreValueLabel = SKLabelNode(text: "0")
         scoreValueLabel.fontName = "SF Pro Display Bold"
-        scoreValueLabel.fontSize = 48
+        scoreValueLabel.fontSize = 52
         scoreValueLabel.fontColor = theme.uiAccentColor
-        scoreValueLabel.position = CGPoint(x: 0, y: 20)
+        scoreValueLabel.position = CGPoint(x: 0, y: yPos)
         container.addChild(scoreValueLabel)
 
         let finalScore = gameState.scoreEngine.currentScore
@@ -440,45 +443,156 @@ extension GameScene {
             scoreValueLabel.text = "\(value)"
         }
         scoreValueLabel.run(countUp)
+        yPos -= 30
 
-        // High score
+        // High score badge
         if gameState.isNewHighScore {
             run(SKAction.wait(forDuration: 1.0)) { [weak self] in
                 self?.animateNewHighScore()
             }
 
-            let newHighLabel = SKLabelNode(text: "NEW HIGH SCORE!")
+            let newHighLabel = SKLabelNode(text: "⭐ NEW HIGH SCORE! ⭐")
             newHighLabel.fontName = "SF Pro Display Heavy"
-            newHighLabel.fontSize = 20
+            newHighLabel.fontSize = 18
             newHighLabel.fontColor = .yellow
-            newHighLabel.position = CGPoint(x: 0, y: -20)
+            newHighLabel.position = CGPoint(x: 0, y: yPos)
             newHighLabel.alpha = 0
             container.addChild(newHighLabel)
-
             newHighLabel.run(SKAction.sequence([
                 SKAction.wait(forDuration: 1.1),
                 SKAction.fadeIn(withDuration: 0.3)
             ]))
+            yPos -= 30
+        } else {
+            let bestLabel = SKLabelNode(text: "Best: \(gameState.scoreEngine.highScore)")
+            bestLabel.fontName = "SF Pro Display"
+            bestLabel.fontSize = 14
+            bestLabel.fontColor = .white.withAlphaComponent(0.6)
+            bestLabel.position = CGPoint(x: 0, y: yPos)
+            container.addChild(bestLabel)
+            yPos -= 25
         }
 
-        // Buttons
-        let buttonY: CGFloat = -80
-        let buttonSpacing: CGFloat = 55
+        // Stats row
+        yPos -= 10
+        let statsRow = SKNode()
+        statsRow.position = CGPoint(x: 0, y: yPos)
+        container.addChild(statsRow)
+
+        let stats: [(String, String)] = [
+            ("Lines", "\(gameState.scoreEngine.totalLinesCleared)"),
+            ("Pieces", "\(gameState.scoreEngine.totalPiecesPlaced)"),
+            ("Best Combo", "\(zoneManager.bestComboThisGame)x"),
+            ("Time", formatTime(gameState.elapsedTime))
+        ]
+
+        let statSpacing: CGFloat = 72
+        let startX = -statSpacing * CGFloat(stats.count - 1) / 2
+
+        for (i, stat) in stats.enumerated() {
+            let x = startX + CGFloat(i) * statSpacing
+
+            let valueLabel = SKLabelNode(text: stat.1)
+            valueLabel.fontName = "SF Pro Display Bold"
+            valueLabel.fontSize = 16
+            valueLabel.fontColor = .white
+            valueLabel.position = CGPoint(x: x, y: 6)
+            valueLabel.alpha = 0
+            statsRow.addChild(valueLabel)
+
+            let titleLabel = SKLabelNode(text: stat.0)
+            titleLabel.fontName = "SF Pro Display"
+            titleLabel.fontSize = 10
+            titleLabel.fontColor = .white.withAlphaComponent(0.5)
+            titleLabel.position = CGPoint(x: x, y: -8)
+            titleLabel.alpha = 0
+            statsRow.addChild(titleLabel)
+
+            // Stagger fade in
+            let delay = 1.2 + Double(i) * 0.1
+            valueLabel.run(SKAction.sequence([SKAction.wait(forDuration: delay), SKAction.fadeIn(withDuration: 0.2)]))
+            titleLabel.run(SKAction.sequence([SKAction.wait(forDuration: delay), SKAction.fadeIn(withDuration: 0.2)]))
+        }
+        yPos -= 40
+
+        // Ghost standings
+        let standings = ghostManager.finalStandings()
+        if !standings.isEmpty {
+            let standingsTitle = SKLabelNode(text: "STANDINGS")
+            standingsTitle.fontName = "SF Pro Display Heavy"
+            standingsTitle.fontSize = 12
+            standingsTitle.fontColor = .white.withAlphaComponent(0.4)
+            standingsTitle.position = CGPoint(x: 0, y: yPos)
+            standingsTitle.alpha = 0
+            container.addChild(standingsTitle)
+            standingsTitle.run(SKAction.sequence([SKAction.wait(forDuration: 1.5), SKAction.fadeIn(withDuration: 0.2)]))
+            yPos -= 22
+
+            for (i, entry) in standings.prefix(3).enumerated() {
+                let rankEmoji = i == 0 ? "🥇" : (i == 1 ? "🥈" : "🥉")
+                let nameText = entry.isPlayer ? "You" : entry.name
+                let highlight = entry.isPlayer
+
+                let row = SKNode()
+                row.position = CGPoint(x: 0, y: yPos)
+                row.alpha = 0
+                container.addChild(row)
+
+                let rankLabel = SKLabelNode(text: "\(rankEmoji) \(entry.emoji) \(nameText)")
+                rankLabel.fontName = highlight ? "SF Pro Display Bold" : "SF Pro Display"
+                rankLabel.fontSize = 14
+                rankLabel.fontColor = highlight ? theme.uiAccentColor : .white.withAlphaComponent(0.7)
+                rankLabel.horizontalAlignmentMode = .left
+                rankLabel.position = CGPoint(x: -120, y: 0)
+                row.addChild(rankLabel)
+
+                let scoreLabel = SKLabelNode(text: "\(entry.score)")
+                scoreLabel.fontName = "SF Pro Display Bold"
+                scoreLabel.fontSize = 14
+                scoreLabel.fontColor = highlight ? theme.uiAccentColor : .white.withAlphaComponent(0.7)
+                scoreLabel.horizontalAlignmentMode = .right
+                scoreLabel.position = CGPoint(x: 120, y: 0)
+                row.addChild(scoreLabel)
+
+                let delay = 1.6 + Double(i) * 0.15
+                row.run(SKAction.sequence([SKAction.wait(forDuration: delay), SKAction.fadeIn(withDuration: 0.2)]))
+                yPos -= 22
+            }
+        }
+        yPos -= 15
+
+        // Buttons (appear after stats)
+        let buttonDelay: TimeInterval = 2.0
+
+        // Watch ad to continue (most prominent if available)
+        if AdManager.shared.canShowRewardedAd(placement: .continueAfterGameOver) {
+            let continueButton = createGameOverButton(text: "▶ Continue (Watch Ad)", name: "continueAdButton",
+                                                       color: UIColor(hex: "4CAF50"), y: yPos)
+            continueButton.alpha = 0
+            container.addChild(continueButton)
+            continueButton.run(SKAction.sequence([SKAction.wait(forDuration: buttonDelay), SKAction.fadeIn(withDuration: 0.2)]))
+            yPos -= 50
+        }
 
         let playAgainButton = createGameOverButton(text: "Play Again", name: "playAgainButton",
-                                                    color: theme.buttonColor, y: buttonY)
+                                                    color: theme.buttonColor, y: yPos)
+        playAgainButton.alpha = 0
         container.addChild(playAgainButton)
+        playAgainButton.run(SKAction.sequence([SKAction.wait(forDuration: buttonDelay + 0.1), SKAction.fadeIn(withDuration: 0.2)]))
+        yPos -= 50
 
-        // Watch ad to continue
-        if AdManager.shared.canShowRewardedAd(placement: .continueAfterGameOver) {
-            let continueButton = createGameOverButton(text: "Watch Ad to Continue", name: "continueAdButton",
-                                                       color: UIColor(hex: "4CAF50"), y: buttonY - buttonSpacing)
-            container.addChild(continueButton)
-        }
+        let shareButton = createGameOverButton(text: "Share Score", name: "shareButton",
+                                                color: UIColor(hex: "1DA1F2"), y: yPos)
+        shareButton.alpha = 0
+        container.addChild(shareButton)
+        shareButton.run(SKAction.sequence([SKAction.wait(forDuration: buttonDelay + 0.2), SKAction.fadeIn(withDuration: 0.2)]))
+        yPos -= 50
 
         let menuButton = createGameOverButton(text: "Main Menu", name: "menuButton",
-                                               color: UIColor.gray, y: buttonY - buttonSpacing * 2)
+                                               color: UIColor.gray.withAlphaComponent(0.6), y: yPos)
+        menuButton.alpha = 0
         container.addChild(menuButton)
+        menuButton.run(SKAction.sequence([SKAction.wait(forDuration: buttonDelay + 0.3), SKAction.fadeIn(withDuration: 0.2)]))
 
         // Fade in container
         container.alpha = 0
@@ -489,12 +603,18 @@ extension GameScene {
         ]))
     }
 
+    private func formatTime(_ seconds: TimeInterval) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+
     private func createGameOverButton(text: String, name: String, color: UIColor, y: CGFloat) -> SKNode {
         let buttonNode = SKNode()
         buttonNode.name = name
         buttonNode.position = CGPoint(x: 0, y: y)
 
-        let bg = SKShapeNode(rectOf: CGSize(width: 240, height: 44), cornerRadius: 12)
+        let bg = SKShapeNode(rectOf: CGSize(width: 260, height: 44), cornerRadius: 12)
         bg.fillColor = color
         bg.strokeColor = .clear
         buttonNode.addChild(bg)
@@ -578,16 +698,36 @@ extension GameScene {
                 }
             }
 
+        case "shareButton":
+            shareScore()
+
         case "menuButton":
             dismissGameOver {
                 self.gameState.returnToMenu()
-                // The SwiftUI container will handle the transition
                 NotificationCenter.default.post(name: .returnToMenu, object: nil)
             }
 
         default:
             break
         }
+    }
+
+    private func shareScore() {
+        let score = gameState.scoreEngine.currentScore
+        let lines = gameState.scoreEngine.totalLinesCleared
+        let bestCombo = zoneManager.bestComboThisGame
+
+        let shareText = """
+        🧩 Gridlock Score: \(score)
+        📊 Lines: \(lines) | Best Combo: \(bestCombo)x
+        Can you beat me? 🔥
+        """
+
+        NotificationCenter.default.post(
+            name: .shareScore,
+            object: nil,
+            userInfo: ["text": shareText, "score": score]
+        )
     }
 
     private func dismissGameOver(completion: @escaping () -> Void) {
@@ -1014,4 +1154,5 @@ extension GameScene {
 extension Notification.Name {
     static let returnToMenu = Notification.Name("returnToMenu")
     static let showDailyChallenge = Notification.Name("showDailyChallenge")
+    static let shareScore = Notification.Name("shareScore")
 }
