@@ -69,6 +69,17 @@ final class GameScene: SKScene {
         refreshGrid()
         refreshPieceTray()
 
+        // Session tracking
+        SessionManager.shared.onGameStart()
+
+        // Apply mercy mode if player is struggling
+        if SessionManager.shared.mercyBonusPieces {
+            gameState.pieceGenerator.isTutorialMode = true
+            run(SKAction.wait(forDuration: 0.5)) { [weak self] in
+                self?.gameState.pieceGenerator.isTutorialMode = false
+            }
+        }
+
         // Zone state reset
         zoneManager.resetForNewGame()
         zoneOverlayNode?.removeFromParent()

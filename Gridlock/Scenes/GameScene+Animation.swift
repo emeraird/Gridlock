@@ -561,6 +561,26 @@ extension GameScene {
         }
         yPos -= 15
 
+        // Session tracking
+        SessionManager.shared.onGameEnd(
+            score: finalScore,
+            linesCleared: gameState.scoreEngine.totalLinesCleared,
+            bestCombo: zoneManager.bestComboThisGame
+        )
+
+        // Session nudge message
+        if let nudge = SessionManager.shared.gameOverNudge {
+            let nudgeLabel = SKLabelNode(text: nudge)
+            nudgeLabel.fontName = "SF Pro Display Medium"
+            nudgeLabel.fontSize = 12
+            nudgeLabel.fontColor = .white.withAlphaComponent(0.7)
+            nudgeLabel.position = CGPoint(x: 0, y: yPos)
+            nudgeLabel.alpha = 0
+            container.addChild(nudgeLabel)
+            nudgeLabel.run(SKAction.sequence([SKAction.wait(forDuration: 1.8), SKAction.fadeIn(withDuration: 0.3)]))
+            yPos -= 20
+        }
+
         // Buttons (appear after stats)
         let buttonDelay: TimeInterval = 2.0
 
@@ -574,7 +594,8 @@ extension GameScene {
             yPos -= 50
         }
 
-        let playAgainButton = createGameOverButton(text: "Play Again", name: "playAgainButton",
+        let playLabel = SessionManager.shared.playAgainLabel
+        let playAgainButton = createGameOverButton(text: playLabel, name: "playAgainButton",
                                                     color: theme.buttonColor, y: yPos)
         playAgainButton.alpha = 0
         container.addChild(playAgainButton)
@@ -681,10 +702,19 @@ extension GameScene {
                 self.ghostManager.startUpdating()
 
                 self.gameState.startNewGame()
+                SessionManager.shared.onGameStart()
                 self.refreshGrid()
                 self.refreshPieceTray()
                 self.updatePowerUpBar()
                 self.updateGhostTicker()
+
+                // Mercy mode for struggling players
+                if SessionManager.shared.mercyBonusPieces {
+                    self.gameState.pieceGenerator.isTutorialMode = true
+                    self.run(SKAction.wait(forDuration: 0.5)) { [weak self] in
+                        self?.gameState.pieceGenerator.isTutorialMode = false
+                    }
+                }
             }
 
         case "continueAdButton":
