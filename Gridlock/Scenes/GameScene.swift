@@ -69,8 +69,9 @@ final class GameScene: SKScene {
         refreshGrid()
         refreshPieceTray()
 
-        // Session tracking
+        // Session & ad tracking
         SessionManager.shared.onGameStart()
+        AdManager.shared.onGameStart()
         NotificationScheduler.onGamePlayed()
 
         // Apply mercy mode if player is struggling
@@ -280,18 +281,22 @@ final class GameScene: SKScene {
     func createPowerUpButton(type: PowerUpType, count: Int) -> SKNode {
         let node = SKNode()
         let isActive = count > 0
-        let iconColor = isActive ? theme.uiAccentColor : UIColor.gray
+        let canWatchAd = !isActive && AdManager.shared.canShowRewardedAd(placement: .freePowerUp)
+        let iconColor = isActive ? theme.uiAccentColor : (canWatchAd ? UIColor(hex: "4CAF50") : UIColor.gray)
 
         // Icon background circle
         let circle = SKShapeNode(circleOfRadius: 22)
-        circle.fillColor = isActive ? theme.uiAccentColor.withAlphaComponent(0.25) : UIColor.gray.withAlphaComponent(0.1)
-        circle.strokeColor = isActive ? theme.uiAccentColor : UIColor.gray.withAlphaComponent(0.3)
+        circle.fillColor = isActive ? theme.uiAccentColor.withAlphaComponent(0.25) :
+            (canWatchAd ? UIColor(hex: "4CAF50").withAlphaComponent(0.15) : UIColor.gray.withAlphaComponent(0.1))
+        circle.strokeColor = isActive ? theme.uiAccentColor :
+            (canWatchAd ? UIColor(hex: "4CAF50").withAlphaComponent(0.5) : UIColor.gray.withAlphaComponent(0.3))
         circle.lineWidth = 1.5
         node.addChild(circle)
 
         // SF Symbol icon rendered as texture
+        let symbolName = canWatchAd ? "play.circle.fill" : type.iconName
         let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
-        if let symbolImage = UIImage(systemName: type.iconName, withConfiguration: symbolConfig)?
+        if let symbolImage = UIImage(systemName: symbolName, withConfiguration: symbolConfig)?
             .withTintColor(iconColor, renderingMode: .alwaysOriginal) {
             let texture = SKTexture(image: symbolImage)
             let iconSprite = SKSpriteNode(texture: texture)
@@ -302,10 +307,12 @@ final class GameScene: SKScene {
         }
 
         // Label underneath
-        let nameLabel = SKLabelNode(text: type.displayName)
+        let labelText = canWatchAd ? "Free!" : type.displayName
+        let nameLabel = SKLabelNode(text: labelText)
         nameLabel.fontName = "SF Pro Display Medium"
         nameLabel.fontSize = 9
-        nameLabel.fontColor = isActive ? .white.withAlphaComponent(0.8) : .gray.withAlphaComponent(0.5)
+        nameLabel.fontColor = isActive ? .white.withAlphaComponent(0.8) :
+            (canWatchAd ? UIColor(hex: "4CAF50").withAlphaComponent(0.9) : .gray.withAlphaComponent(0.5))
         nameLabel.verticalAlignmentMode = .top
         nameLabel.horizontalAlignmentMode = .center
         nameLabel.position = CGPoint(x: 0, y: -27)

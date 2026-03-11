@@ -1,14 +1,27 @@
 import Foundation
 
 struct MonetizationConfig {
+    // MARK: - Ad Pacing
     static let honeymoonGames = 5
     static let interstitialMinInterval: TimeInterval = 180  // 3 min between interstitials
     static let interstitialMaxPerSession = 4
+    static let interstitialEveryNGames = 3  // Show interstitial every N games
     static let rewardedAdMaxPerDay = 5
     static let rewardedContinueMaxPerGame = 1
     static let showInterstitialOnFirstSessionGame = false
     static let notificationPermissionPromptAfterGame = 3
     static let rewardedPowerUpMaxPerDay = 3
+
+    // MARK: - Upsell Timing
+    static let removeAdsUpsellAfterInterstitials = 2  // Show upsell after N interstitials
+    static let removeAdsUpsellCooldown: TimeInterval = 86400  // 24h between upsells
+    static let removeAdsUpsellMaxPerSession = 1
+    static let themeUpsellAfterGames = 10  // Suggest themes after N games
+
+    // MARK: - Rewarded Ad Bonuses
+    static let doubleDailyRewardEnabled = true
+    static let watchAdForPowerUpEnabled = true
+    static let continueAdClearRows = 3  // Clear bottom N rows on continue
 
     // IAP Product IDs
     enum ProductID {

@@ -9,8 +9,40 @@ extension GameScene {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
 
+        // Remove ads popup: handle taps
+        if let upsellPopup = childNode(withName: "removeAdsPopup") {
+            // Check CTA button
+            if let ctaBtn = upsellPopup.childNode(withName: "removeAdsCTA") {
+                let btnPos = ctaBtn.convert(CGPoint.zero, to: self)
+                if location.distance(to: btnPos) < 60 {
+                    HapticManager.shared.buttonTap()
+                    dismissRemoveAdsPopup()
+                    // Trigger IAP purchase flow
+                    Task {
+                        if let product = IAPManager.shared.product(for: MonetizationConfig.ProductID.removeAdsMonthly) {
+                            _ = try? await IAPManager.shared.purchase(product)
+                        }
+                    }
+                    return
+                }
+            }
+            // Dismiss button or tap outside
+            HapticManager.shared.buttonTap()
+            dismissRemoveAdsPopup()
+            return
+        }
+
         // Daily reward popup: handle collect tap
         if let popup = childNode(withName: "dailyRewardPopup") {
+            // Check "Double It!" button first
+            if let doubleBtn = popup.childNode(withName: "doubleDailyReward") {
+                let btnPos = doubleBtn.convert(CGPoint.zero, to: self)
+                if location.distance(to: btnPos) < 60 {
+                    HapticManager.shared.buttonTap()
+                    doubleDailyReward()
+                    return
+                }
+            }
             // Check if tapping the collect button
             if let collectBtn = popup.childNode(withName: "collectDailyReward") {
                 let btnPos = collectBtn.convert(CGPoint.zero, to: self)
@@ -59,12 +91,19 @@ extension GameScene {
             return location.distance(to: nodePos) < 30
         }), let name = powerUpNode.name, name.hasPrefix("powerUp_") {
             let typeStr = String(name.dropFirst("powerUp_".count))
-            if let type = PowerUpType(rawValue: typeStr), gameState.powerUpSystem.canUse(type) {
-                HapticManager.shared.buttonTap()
-                AudioManager.shared.play(.buttonTap)
-                gameState.enterPowerUpMode(type)
-                showPowerUpModeIndicator(type)
-                return
+            if let type = PowerUpType(rawValue: typeStr) {
+                if gameState.powerUpSystem.canUse(type) {
+                    HapticManager.shared.buttonTap()
+                    AudioManager.shared.play(.buttonTap)
+                    gameState.enterPowerUpMode(type)
+                    showPowerUpModeIndicator(type)
+                    return
+                } else if AdManager.shared.canShowRewardedAd(placement: .freePowerUp) {
+                    // Empty slot with ad available — offer free power-up
+                    HapticManager.shared.buttonTap()
+                    showWatchAdForPowerUp()
+                    return
+                }
             }
         }
 

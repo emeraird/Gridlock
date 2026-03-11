@@ -24,11 +24,16 @@ final class AdManager: ObservableObject {
     private var lastRewardedDate: Date?
     private var continueUsedThisGame = false
     private var sessionGameCount = 0
+    private var upsellsShownThisSession = 0
+    private var lastUpsellDate: Date?
+    private var totalInterstitialsShownLifetime = 0
 
     private let logger = Logger(subsystem: "com.gridlock.app", category: "AdManager")
 
     private init() {
         resetDailyCountsIfNeeded()
+        totalInterstitialsShownLifetime = UserDefaults.standard.integer(forKey: "totalInterstitialsLifetime")
+        lastUpsellDate = UserDefaults.standard.object(forKey: "lastUpsellDate") as? Date
     }
 
     // MARK: - Session Management
@@ -37,6 +42,9 @@ final class AdManager: ObservableObject {
         sessionGameCount = 0
         interstitialCount = 0
         lastInterstitialTime = nil
+        upsellsShownThisSession = 0
+        preloadRewardedAd()
+        preloadInterstitial()
     }
 
     func onGameStart() {
@@ -69,6 +77,11 @@ final class AdManager: ObservableObject {
             guard elapsed >= MonetizationConfig.interstitialMinInterval else { return false }
         }
 
+        // Smart pacing: only show every N games
+        if sessionGameCount % MonetizationConfig.interstitialEveryNGames != 0 {
+            return false
+        }
+
         return isInterstitialReady
     }
 
@@ -94,11 +107,48 @@ final class AdManager: ObservableObject {
             return isRewardedAdReady
 
         case .doubleDailyReward:
+            guard MonetizationConfig.doubleDailyRewardEnabled else { return false }
             return isRewardedAdReady
 
         case .interstitialAfterGame:
             return canShowInterstitial()
         }
+    }
+
+    // MARK: - Upsell Logic
+
+    /// Whether to show "Remove Ads" soft upsell
+    func shouldShowRemoveAdsUpsell() -> Bool {
+        let progress = UserProgressManager.shared
+        guard !progress.removeAdsActive else { return false }
+        guard !progress.isInHoneymoonPeriod else { return false }
+        guard upsellsShownThisSession < MonetizationConfig.removeAdsUpsellMaxPerSession else { return false }
+
+        // Cooldown check
+        if let lastDate = lastUpsellDate {
+            guard Date().timeIntervalSince(lastDate) >= MonetizationConfig.removeAdsUpsellCooldown else { return false }
+        }
+
+        // Show after N interstitials
+        guard totalInterstitialsShownLifetime >= MonetizationConfig.removeAdsUpsellAfterInterstitials else { return false }
+
+        return true
+    }
+
+    func recordUpsellShown() {
+        upsellsShownThisSession += 1
+        lastUpsellDate = Date()
+        UserDefaults.standard.set(lastUpsellDate, forKey: "lastUpsellDate")
+        logger.info("Remove ads upsell shown (session count: \(self.upsellsShownThisSession))")
+    }
+
+    /// Whether to suggest theme purchases
+    func shouldSuggestThemes() -> Bool {
+        let progress = UserProgressManager.shared
+        guard progress.gamesPlayedSinceInstall >= MonetizationConfig.themeUpsellAfterGames else { return false }
+        // Don't suggest if user already owns themes
+        guard progress.purchasedThemes.count <= 1 else { return false }
+        return true
     }
 
     // MARK: - Ad Display (Stubs)
@@ -124,7 +174,13 @@ final class AdManager: ObservableObject {
             rewardedPowerUpsToday += 1
         }
 
+        // Track conversion
+        trackConversion(placement: placement, success: true)
+
         completion(true)
+
+        // Preload next ad
+        preloadRewardedAd()
     }
 
     /// Show an interstitial ad.
@@ -134,13 +190,36 @@ final class AdManager: ObservableObject {
             return
         }
 
-        logger.info("Showing interstitial ad")
+        logger.info("Showing interstitial ad (#\(self.interstitialCount + 1) this session)")
 
         // TODO: Integrate Google AdMob SDK
         interstitialCount += 1
+        totalInterstitialsShownLifetime += 1
+        UserDefaults.standard.set(totalInterstitialsShownLifetime, forKey: "totalInterstitialsLifetime")
         lastInterstitialTime = Date()
 
+        // Preload next
+        preloadInterstitial()
+
         completion()
+    }
+
+    // MARK: - Smart Interstitial (post-game)
+
+    /// Call after every game over. Handles interstitial + optional upsell flow.
+    func handlePostGameAd(from viewController: Any?, completion: @escaping (_ showedAd: Bool, _ shouldUpsell: Bool) -> Void) {
+        if canShowInterstitial() {
+            showInterstitial(from: viewController) { [weak self] in
+                guard let self = self else { return }
+                let shouldUpsell = self.shouldShowRemoveAdsUpsell()
+                if shouldUpsell {
+                    self.recordUpsellShown()
+                }
+                completion(true, shouldUpsell)
+            }
+        } else {
+            completion(false, false)
+        }
     }
 
     // MARK: - Preloading
@@ -166,5 +245,26 @@ final class AdManager: ObservableObject {
             rewardedPowerUpsToday = 0
         }
         lastRewardedDate = today
+    }
+
+    // MARK: - Conversion Tracking
+
+    private func trackConversion(placement: AdPlacement, success: Bool) {
+        let key = "adConversion_\(placement.rawValue)"
+        let count = UserDefaults.standard.integer(forKey: key)
+        UserDefaults.standard.set(count + 1, forKey: key)
+        logger.info("Ad conversion: \(placement.rawValue) total=\(count + 1)")
+    }
+
+    // MARK: - Stats for Debug
+
+    var debugStats: String {
+        """
+        Session games: \(sessionGameCount)
+        Interstitials: \(interstitialCount)/\(MonetizationConfig.interstitialMaxPerSession)
+        Rewarded today: \(rewardedAdsToday)/\(MonetizationConfig.rewardedAdMaxPerDay)
+        Power-up ads: \(rewardedPowerUpsToday)/\(MonetizationConfig.rewardedPowerUpMaxPerDay)
+        Lifetime interstitials: \(totalInterstitialsShownLifetime)
+        """
     }
 }

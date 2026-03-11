@@ -568,6 +568,17 @@ extension GameScene {
             bestCombo: zoneManager.bestComboThisGame
         )
 
+        // Smart interstitial ad + optional upsell
+        AdManager.shared.handlePostGameAd(from: nil) { [weak self] showedAd, shouldUpsell in
+            guard let self = self else { return }
+            if shouldUpsell {
+                // Show upsell after a brief delay (let interstitial settle)
+                self.run(SKAction.wait(forDuration: 0.5)) {
+                    self.showRemoveAdsUpsell()
+                }
+            }
+        }
+
         // Session nudge message
         if let nudge = SessionManager.shared.gameOverNudge {
             let nudgeLabel = SKLabelNode(text: nudge)
@@ -703,6 +714,7 @@ extension GameScene {
 
                 self.gameState.startNewGame()
                 SessionManager.shared.onGameStart()
+                AdManager.shared.onGameStart()
                 self.refreshGrid()
                 self.refreshPieceTray()
                 self.updatePowerUpBar()
@@ -765,7 +777,6 @@ extension GameScene {
             completion()
         }
     }
-}
 
     // MARK: - Daily Reward Popup
 
@@ -830,7 +841,7 @@ extension GameScene {
 
         let collectBtn = SKNode()
         collectBtn.name = "collectDailyReward"
-        collectBtn.position = CGPoint(x: 0, y: -90)
+        collectBtn.position = CGPoint(x: 0, y: -85)
 
         let btnBg = SKShapeNode(rectOf: CGSize(width: 200, height: 44), cornerRadius: 12)
         btnBg.fillColor = UIColor.orange
@@ -845,6 +856,28 @@ extension GameScene {
         collectBtn.addChild(btnLabel)
 
         popup.addChild(collectBtn)
+
+        // "Double It!" rewarded ad button
+        if AdManager.shared.canShowRewardedAd(placement: .doubleDailyReward) {
+            let doubleBtn = SKNode()
+            doubleBtn.name = "doubleDailyReward"
+            doubleBtn.position = CGPoint(x: 0, y: -135)
+
+            let dblBg = SKShapeNode(rectOf: CGSize(width: 200, height: 36), cornerRadius: 10)
+            dblBg.fillColor = UIColor(hex: "4CAF50")
+            dblBg.strokeColor = .clear
+            doubleBtn.addChild(dblBg)
+
+            let dblLabel = SKLabelNode(text: "▶ Double It! (Watch Ad)")
+            dblLabel.fontName = "SF Pro Display Bold"
+            dblLabel.fontSize = 13
+            dblLabel.fontColor = .white
+            dblLabel.verticalAlignmentMode = .center
+            doubleBtn.addChild(dblLabel)
+
+            popup.addChild(doubleBtn)
+        }
+
         addChild(popup)
 
         popup.run(SKAction.group([
@@ -875,6 +908,169 @@ extension GameScene {
         updatePowerUpBar()
         HapticManager.shared.dailyRewardCollect()
         AudioManager.shared.play(.dailyReward)
+    }
+
+    func doubleDailyReward() {
+        AdManager.shared.showRewardedAd(placement: .doubleDailyReward, from: nil) { [weak self] success in
+            guard let self = self, success else { return }
+
+            // Collect reward (normal)
+            guard let reward = DailyRewardManager.shared.collectReward(powerUpSystem: self.gameState.powerUpSystem) else { return }
+
+            // Award bonus duplicate set
+            for (type, count) in reward.powerUps {
+                for _ in 0..<count {
+                    self.gameState.powerUpSystem.earn(type, reason: "daily reward double bonus")
+                }
+            }
+
+            if let popup = self.childNode(withName: "dailyRewardPopup") {
+                popup.run(SKAction.sequence([
+                    SKAction.group([
+                        SKAction.fadeOut(withDuration: 0.2),
+                        SKAction.scale(to: 1.1, duration: 0.2)
+                    ]),
+                    SKAction.removeFromParent()
+                ]))
+            }
+
+            // Show "Doubled!" label
+            let doubledLabel = SKLabelNode(text: "DOUBLED! 🎉")
+            doubledLabel.fontName = "SF Pro Display Heavy"
+            doubledLabel.fontSize = 28
+            doubledLabel.fontColor = UIColor(hex: "4CAF50")
+            doubledLabel.position = CGPoint(x: self.size.width / 2, y: self.size.height / 2)
+            doubledLabel.zPosition = 96
+            doubledLabel.alpha = 0
+            doubledLabel.setScale(0.5)
+            self.addChild(doubledLabel)
+
+            doubledLabel.run(SKAction.sequence([
+                SKAction.group([
+                    SKAction.fadeIn(withDuration: 0.15),
+                    SKAction.bounceIn(to: 1.0, duration: 0.25)
+                ]),
+                SKAction.wait(forDuration: 0.8),
+                SKAction.group([
+                    SKAction.fadeOut(withDuration: 0.3),
+                    SKAction.moveBy(x: 0, y: 40, duration: 0.3)
+                ]),
+                SKAction.removeFromParent()
+            ]))
+
+            self.updatePowerUpBar()
+            HapticManager.shared.dailyRewardCollect()
+            AudioManager.shared.play(.dailyReward)
+        }
+    }
+
+    // MARK: - Remove Ads Upsell
+
+    func showRemoveAdsUpsell() {
+        let popup = SKNode()
+        popup.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        popup.zPosition = 96
+        popup.name = "removeAdsPopup"
+        popup.alpha = 0
+        popup.setScale(0.5)
+
+        let dim = SKSpriteNode(color: UIColor.black.withAlphaComponent(0.6), size: size)
+        dim.position = .zero
+        dim.zPosition = -1
+        popup.addChild(dim)
+
+        let card = SKShapeNode(rectOf: CGSize(width: 290, height: 200), cornerRadius: 20)
+        card.fillColor = UIColor(white: 0.12, alpha: 1.0)
+        card.strokeColor = theme.uiAccentColor.withAlphaComponent(0.5)
+        card.lineWidth = 2
+        card.glowWidth = 4
+        popup.addChild(card)
+
+        // Title
+        let titleLabel = SKLabelNode(text: "Tired of Ads?")
+        titleLabel.fontName = "SF Pro Display Heavy"
+        titleLabel.fontSize = 22
+        titleLabel.fontColor = .white
+        titleLabel.position = CGPoint(x: 0, y: 60)
+        popup.addChild(titleLabel)
+
+        // Benefit text
+        let benefit1 = SKLabelNode(text: "No more interruptions")
+        benefit1.fontName = "SF Pro Display Medium"
+        benefit1.fontSize = 14
+        benefit1.fontColor = .white.withAlphaComponent(0.8)
+        benefit1.position = CGPoint(x: 0, y: 28)
+        popup.addChild(benefit1)
+
+        let benefit2 = SKLabelNode(text: "Support the developer")
+        benefit2.fontName = "SF Pro Display Medium"
+        benefit2.fontSize = 14
+        benefit2.fontColor = .white.withAlphaComponent(0.8)
+        benefit2.position = CGPoint(x: 0, y: 8)
+        popup.addChild(benefit2)
+
+        // CTA button
+        let ctaBtn = SKNode()
+        ctaBtn.name = "removeAdsCTA"
+        ctaBtn.position = CGPoint(x: 0, y: -35)
+
+        let ctaBg = SKShapeNode(rectOf: CGSize(width: 220, height: 44), cornerRadius: 12)
+        ctaBg.fillColor = theme.uiAccentColor
+        ctaBg.strokeColor = .clear
+        ctaBtn.addChild(ctaBg)
+
+        let ctaLabel = SKLabelNode(text: "Remove Ads")
+        ctaLabel.fontName = "SF Pro Display Bold"
+        ctaLabel.fontSize = 16
+        ctaLabel.fontColor = .white
+        ctaLabel.verticalAlignmentMode = .center
+        ctaBtn.addChild(ctaLabel)
+        popup.addChild(ctaBtn)
+
+        // Dismiss
+        let dismissLabel = SKLabelNode(text: "No thanks")
+        dismissLabel.fontName = "SF Pro Display"
+        dismissLabel.fontSize = 13
+        dismissLabel.fontColor = .white.withAlphaComponent(0.5)
+        dismissLabel.position = CGPoint(x: 0, y: -72)
+        dismissLabel.name = "dismissUpsell"
+        popup.addChild(dismissLabel)
+
+        addChild(popup)
+
+        popup.run(SKAction.group([
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.bounceIn(to: 1.0, duration: 0.3)
+        ]))
+
+        HapticManager.shared.buttonTap()
+    }
+
+    func dismissRemoveAdsPopup() {
+        if let popup = childNode(withName: "removeAdsPopup") {
+            popup.run(SKAction.sequence([
+                SKAction.fadeOut(withDuration: 0.2),
+                SKAction.removeFromParent()
+            ]))
+        }
+    }
+
+    // MARK: - Watch Ad for Power-Up
+
+    func showWatchAdForPowerUp() {
+        guard MonetizationConfig.watchAdForPowerUpEnabled,
+              AdManager.shared.canShowRewardedAd(placement: .freePowerUp) else { return }
+
+        AdManager.shared.showRewardedAd(placement: .freePowerUp, from: nil) { [weak self] success in
+            guard let self = self, success else { return }
+
+            // Award a random power-up
+            let types = PowerUpType.allCases
+            let type = types.randomElement() ?? .bomb
+            self.gameState.powerUpSystem.earn(type, reason: "watched ad")
+            self.animatePowerUpEarned(type)
+            self.updatePowerUpBar()
+        }
     }
 
     // MARK: - Milestone Celebration
