@@ -19,7 +19,7 @@ struct SettingsView: View {
                 // Haptics section
                 Section("Haptics") {
                     Toggle("Vibration Feedback", isOn: $hapticsEnabled)
-                        .onChange(of: hapticsEnabled) { _, newValue in
+                        .onChange(of: hapticsEnabled) { newValue in
                             HapticManager.shared.isEnabled = newValue
                         }
                 }
